@@ -1,0 +1,29 @@
+[project]
+name = "xaiguiformer-mlreproducibility"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Robin Guiavarch",email = "robin.guiavarch@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "torch (>=2.7.0,<3.0.0)",
+    "torchvision (>=0.22.0,<0.23.0)",
+    "torchaudio (>=2.7.0,<3.0.0)",
+    "pytorch-lightning (>=2.5.1.post0,<3.0.0)",
+    "numpy (>=2.2.5,<3.0.0)",
+    "pandas (>=2.2.3,<3.0.0)",
+    "scikit-learn (>=1.6.1,<2.0.0)",
+    "matplotlib (>=3.10.3,<4.0.0)",
+    "seaborn (>=0.13.2,<0.14.0)",
+    "wandb (>=0.19.11,<0.20.0)",
+    "hydra-core (>=1.3.2,<2.0.0)",
+    "omegaconf (>=2.3.0,<3.0.0)",
+    "tensorboard (>=2.19.0,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
