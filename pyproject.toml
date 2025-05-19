@@ -5,6 +5,7 @@ description = ""
 authors = [
     {name = "Robin Guiavarch",email = "robin.guiavarch@gmail.com"}
 ]
+package-mode = false
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
@@ -24,7 +25,11 @@ dependencies = [
     "scipy (>=1.15.3,<2.0.0)",
     "plotly (>=6.1.0,<7.0.0)",
     "nbformat (>=5.10.4,<6.0.0)",
-    "ipykernel (>=6.29.5,<7.0.0)"
+    "ipykernel (>=6.29.5,<7.0.0)",
+    "mne (>=1.9.0,<2.0.0)",
+    "networkx (>=3.4.2,<4.0.0)",
+    "joblib (>=1.5.0,<2.0.0)",
+    "mne-connectivity (>=0.7.0,<0.8.0)",
 ]
 
 
