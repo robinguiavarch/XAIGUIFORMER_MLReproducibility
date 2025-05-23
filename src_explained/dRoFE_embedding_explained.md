@@ -1,4 +1,4 @@
-# 🧠 Understanding `dRoFEEmbedding.py` – Line-by-Line Explanation with Math
+# 🧠 Understanding `dRoFEEmbedding.py` – Line-by-Line Explanation 
 
 This document explains the Python code in `dRoFEEmbedding.py` by linking it directly to the theoretical equations from the XAIGUIFormer paper (ICLR 2025).
 
@@ -7,7 +7,7 @@ This document explains the Python code in `dRoFEEmbedding.py` by linking it dire
 ## 📌 Mathematical Background
 
 - **Equation (9)**: Defines rotary encoding based on frequency bounds (lower and upper).
-- **Equation (10)**: Angular position per embedding dimension: \( \theta_t = \frac{4\pi t}{d} \)
+- **Equation (10)**: Angular position per embedding dimension: $ \theta_t = \frac{4\pi t}{d} $
 - **Equation (11)**: Combines rotary encoding with demographic info (age × rotation + gender bias).
 - **Equation (12)**: Applies this rotation to Query/Key vectors in the attention mechanism.
 
@@ -21,7 +21,7 @@ This document explains the Python code in `dRoFEEmbedding.py` by linking it dire
 self.theta = 4 * math.pi * torch.arange(0, embedding_dim // 2) / embedding_dim
 ```
 
-- Implements Equation (10): \( \theta_t = \frac{4\pi t}{d} \)
+- Implements Equation (10): $ \theta_t = \frac{4\pi t}{d} $
 - Prepares angles used for rotation in each half-dimension.
 
 ---
@@ -62,8 +62,8 @@ x_rot_imag = rot_real * x2 + rot_imag * x1
 ```
 
 - Equivalent to complex multiplication:
-    - \( \text{Re}(R) \cdot x_1 - \text{Im}(R) \cdot x_2 \)
-    - \( \text{Re}(R) \cdot x_2 + \text{Im}(R) \cdot x_1 \)
+    - $ \text{Re}(R) \cdot x_1 - \text{Im}(R) \cdot x_2 $
+    - $ \text{Re}(R) \cdot x_2 + \text{Im}(R) \cdot x_1 $
 
 ---
 
@@ -73,7 +73,7 @@ x_rot_imag = rot_real * x2 + rot_imag * x1
 x_rot = torch.stack([x_rot_real, x_rot_imag], dim=-1).flatten(-2)
 ```
 
-- Recombines rotated parts to get \( x'_f = R^d_{f,Demog} \cdot x_f \)
+- Recombines rotated parts to get $ x'_f = R^d_{f,Demog} \cdot x_f $
 - Matches Equation (12).
 
 ---
