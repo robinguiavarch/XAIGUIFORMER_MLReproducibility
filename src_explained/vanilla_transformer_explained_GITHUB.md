@@ -8,17 +8,17 @@ This document explains the logic of `vanilla_transformer.py` line by line, in re
 
 ### 🔹 Multi-Head Attention
 
-Given an input tensor \( X \in \mathbb{R}^{B \times F \times d} \), the Transformer computes:
+Given an input tensor `X ∈ ℝ^{B × F × d}`, the Transformer computes:
 
-- Queries: \( Q = XW_q \)
-- Keys: \( K = XW_k \)
-- Values: \( V = XW_v \)
+- Queries: `Q = X @ W_q`
+- Keys: `K = X @ W_k`
+- Values: `V = X @ W_v`
 
 Each attention head computes:
 
-\[
-\text{Attention}(Q, K, V) = \text{softmax}\left(\frac{QK^T}{\sqrt{d}}\right)V
-\]
+```
+Attention(Q, K, V) = softmax((Q @ Kᵀ) / sqrt(d)) @ V
+```
 
 This captures dependencies between tokens (here: frequency bands), regardless of position.
 
@@ -30,11 +30,10 @@ Multiple heads are used in parallel to learn **diverse interactions**. Their out
 
 A lightweight alternative to LayerNorm:
 
-\[
-\text{RMSNorm}(x) = \frac{x}{\text{RMS}(x)} \cdot \gamma
-\quad \text{where} \quad
-\text{RMS}(x) = \sqrt{\frac{1}{d}\sum_{i=1}^d x_i^2}
-\]
+```
+RMSNorm(x) = x / RMS(x) * gamma
+where RMS(x) = sqrt(mean(x_i^2 for i in 1..d))
+```
 
 Used instead of LayerNorm to reduce compute while preserving stability.
 
@@ -44,9 +43,9 @@ Used instead of LayerNorm to reduce compute while preserving stability.
 
 Each encoder block includes a 2-layer MLP applied to each token independently:
 
-\[
-\text{FFN}(x) = \text{GELU}(xW_1 + b_1)W_2 + b_2
-\]
+```
+FFN(x) = GELU(x @ W1 + b1) @ W2 + b2
+```
 
 This increases the expressivity of the model.
 
@@ -81,20 +80,18 @@ def forward(self, x):
     return self.layernorm(x)
 ```
 
-- Input: \( x \in \mathbb{R}^{B \times F \times d} \) — sequence of connectome tokens
+- Input: `x ∈ ℝ^{B × F × d}` — sequence of connectome tokens
 - Output: same shape, updated token representations
 
 ---
 
-## 🖼️ Architecture Diagram (see image)
-
-From the provided figure:
+## 🖼️ Architecture Diagram
 
 ```
 Input → Connectome Tokenizer → [Vanilla Multi-Head Attention → RMSNorm → Feed Forward → RMSNorm] → Output
 ```
 
-This encoder block is stacked \( L \) times (e.g. 4 layers) to form a deep Transformer.
+This encoder block is stacked `L` times (e.g. 4 layers) to form a deep Transformer.
 
 ---
 
@@ -104,7 +101,7 @@ This encoder block is stacked \( L \) times (e.g. 4 layers) to form a deep Trans
 - **Attention** learns relations between EEG frequency bands.
 - **RMSNorm** stabilizes training with lower computational cost.
 - **Feedforward** layers expand the representational power of each token.
-- The full encoder outputs \( X' \in \mathbb{R}^{B \times F \times d} \), ready for classification or refinement.
+- The full encoder outputs `X' ∈ ℝ^{B × F × d}`, ready for classification or refinement.
 
 ---
 

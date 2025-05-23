@@ -12,15 +12,15 @@ XAIGuiFormer uses **two prediction heads**:
 
 To train both simultaneously, the model combines both losses:
 
-\[
-\mathcal{L} = (1 - \alpha) \cdot \text{CE}(\hat{y}_{\text{coarse}}, y) + \alpha \cdot \text{CE}(\hat{y}_{\text{refined}}, y)
-\]
+```
+L = (1 - alpha) * CE(y_coarse, y_true) + alpha * CE(y_refined, y_true)
+```
 
 Where:
-- \( \hat{y}_{\text{coarse}} \) = logits from vanilla transformer
-- \( \hat{y}_{\text{refined}} \) = logits from XAI-guided transformer
-- \( y \) = ground truth label
-- \( \alpha \in [0,1] \) = trade-off parameter
+- `y_coarse` = logits from vanilla transformer
+- `y_refined` = logits from XAI-guided transformer
+- `y_true` = ground truth label
+- `alpha ∈ [0,1]` = trade-off parameter
 
 ---
 

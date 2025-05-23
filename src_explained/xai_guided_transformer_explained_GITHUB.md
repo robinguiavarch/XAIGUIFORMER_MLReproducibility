@@ -12,13 +12,13 @@ Unlike the vanilla Transformer that uses learned Q and K projections, this modul
 
 The attention score is recalculated manually using:
 
-\[
-\text{Attention}(Q_{\text{expl}}, K_{\text{expl}}, V) = \text{softmax}\left(\frac{Q_{\text{expl}} K_{\text{expl}}^T}{\sqrt{d}}\right)V
-\]
+```
+Attention(Q_expl, K_expl, V) = softmax((Q_expl @ K_expl.T) / sqrt(d)) @ V
+```
 
 Where:
-- \( Q_{\text{expl}}, K_{\text{expl}} \) are the XAI-guided feature importance maps
-- \( V \) is the original input tensor
+- `Q_expl`, `K_expl` are the XAI-guided feature importance maps
+- `V` is the original input tensor
 
 This allows attention to **focus on semantically meaningful relationships** identified by an explanation method (e.g., DeepLIFT).
 
@@ -28,17 +28,17 @@ This allows attention to **focus on semantically meaningful relationships** iden
 
 This module uses **GeGLU (Gated GELU)** activation in the feedforward network:
 
-\[
-\text{GeGLU}(x) = \text{GELU}(x_1) \cdot x_2
-\]
+```
+GeGLU(x) = GELU(x1) * x2
+```
 
 The feedforward block is then:
 
-\[
-\text{FF}(x) = W_2 (\text{GeGLU}(W_1 x))
-\]
+```
+FF(x) = W2(GeGLU(W1 x))
+```
 
-Where \( W_1 \) splits into two heads: \( x_1, x_2 \in \mathbb{R}^{d} \).
+Where `W1` splits into two heads: `x1, x2 ∈ ℝ^d`.
 
 ---
 
@@ -46,9 +46,9 @@ Where \( W_1 \) splits into two heads: \( x_1, x_2 \in \mathbb{R}^{d} \).
 
 As in the vanilla encoder, each sub-block (attention, FFN) is followed by **residual + RMSNorm** for training stability:
 
-\[
-\text{RMSNorm}(x) = \frac{x}{\text{RMS}(x)} \cdot \gamma
-\]
+```
+RMSNorm(x) = x / RMS(x) * gamma
+```
 
 ---
 
@@ -60,7 +60,7 @@ class XAIGuidedTransformerLayer(nn.Module):
         # XAI-guided attention
         attn_out = softmax(q_expl @ k_expl.T / sqrt(d)) @ x
         x = RMSNorm(x + dropout(attn_out))
-        
+
         # Feedforward with GeGLU
         ff = Linear2(GeGLU(Linear1(x)))
         x = RMSNorm(x + dropout(ff))

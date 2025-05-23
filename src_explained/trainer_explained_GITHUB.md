@@ -48,7 +48,7 @@ Trainer/
 │   └── logits_refined = Classifier(mean(x_refined))   # [B, C]
 │
 ├── Step 5 – Joint Loss:
-│   └── total_loss = (1 - α) * CE(logits_coarse, y_true) + α * CE(logits_refined, y_true)
+│   └── total_loss = (1 - alpha) * CE(logits_coarse, y_true) + alpha * CE(logits_refined, y_true)
 │
 └── Outputs:
     ├── If y_true is None:
