@@ -1,3 +1,12 @@
+"""
+Ce script est un copier-coller fidèle de la méthode de prétraitement EEG décrite dans l'article de référence.
+Il utilise le pipeline PREP (détection des canaux bruyants, interpolation), le filtrage, la segmentation en epochs
+basée sur les événements "yeux fermés", l'ICA avec étiquetage automatique des composantes (ICLabel), 
+et la re-référence moyenne finale.
+
+Le but est de préparer les données EEG pour une analyse de connectivité (connectomes).
+"""
+
 import os
 import mne
 import numpy as np
@@ -8,6 +17,19 @@ from config import get_cfg_defaults
 from pyprep.prep_pipeline import PrepPipeline
 
 def custom_read_raw_brainvision(fname, montage, phenotype, preload=True):
+    """
+    Charge un fichier EEG au format BrainVision avec les bons types de canaux,
+    le montage EEG standard et crée des événements "yeux fermés" artificiels.
+
+    Args:
+        fname (str): Chemin vers le fichier .vhdr.
+        montage (mne.channels.DigMontage): Montage EEG.
+        phenotype (str): Nom du sujet ou description du phénotype.
+        preload (bool): Précharge ou non les données en mémoire.
+
+    Returns:
+        raw (mne.io.Raw): Objet Raw EEG avec événements ajoutés.
+    """
     EEG_raw = mne.io.read_raw_brainvision(fname, preload=preload)
     channel_type = {'VPVA': 'eog', 'VNVB': 'eog',
                     'HPHL': 'eog', 'HNHR': 'eog',
@@ -21,6 +43,22 @@ def custom_read_raw_brainvision(fname, montage, phenotype, preload=True):
     return EEG_raw
 
 def preprocessing(EEG_raw, config, verbose=True):
+    """
+    Applique un pipeline complet de prétraitement EEG :
+    - Détection et interpolation des canaux brutés
+    - Filtrage bande-passante
+    - Découpage en epochs "yeux fermés"
+    - ICA + ICLabel pour suppression des artéfacts
+    - Re-référence moyenne
+
+    Args:
+        EEG_raw (mne.io.Raw): Enregistrement brut chargé.
+        config (CfgNode): Configuration globale.
+        verbose (bool): Affiche les étapes ou non.
+
+    Returns:
+        EEG_interp (mne.Epochs): Signal EEG prétraité.
+    """
     n_jobs = config.preprocessing.n_jobs
     n_step = 0
 
@@ -77,6 +115,17 @@ def preprocessing(EEG_raw, config, verbose=True):
     return EEG_interp.set_eeg_reference(ref_channels='average', ch_type='eeg')
 
 def preprocessingPipeline(fname, montage, phenotype, config, save_path):
+    """
+    Exécute le pipeline complet de prétraitement EEG sur un fichier donné.
+    Sauvegarde le fichier `.fif` résultant à l’emplacement souhaité.
+
+    Args:
+        fname (str): Chemin vers le fichier EEG .vhdr.
+        montage (mne.channels.DigMontage): Montage EEG.
+        phenotype (str): Description du sujet.
+        config (CfgNode): Configuration générale.
+        save_path (str): Chemin de sauvegarde du fichier prétraité.
+    """
     EEG_raw = custom_read_raw_brainvision(fname, montage, phenotype)
     if EEG_raw.info['description'] != 'bad':
         EEG_prep = preprocessing(EEG_raw, config, verbose=False)
@@ -112,5 +161,3 @@ if __name__ == "__main__":
                 montage = mne.channels.make_standard_montage("standard_1020")
                 save_path = os.path.join(save_dir, subj_dir, "ses-1", f'{file_base}_EC_epo.fif')
                 preprocessingPipeline(fname, montage, file_base, cfg, save_path)
-
-
