@@ -60,3 +60,30 @@ class Explainer:
                                                 target=target_labels)
 
         return attributions.detach()
+
+""""
+Explainer/
+│
+├── Inputs:
+│   ├── x_input      : Tensor [B, Freq, d]       # Token embeddings (e.g., q_rot or k_rot)
+│   └── target_labels: Tensor [B]               # Ground-truth class labels
+│
+├── Internals:
+│   ├── forward_fn(x_input)
+│   │   ├── Passes x_input through:
+│   │   │   → VanillaTransformerEncoder(x_input)
+│   │   │   → Mean-pooling over frequency axis: x_mean = x_out.mean(dim=1)
+│   │   │   → Linear classifier: classifier_coarse(x_mean)
+│   │   └── Returns logits [B, C]
+│   │
+│   ├── explainer = DeepLift(forward_fn)
+│   │   └── Captum DeepLift wrapper around forward_fn
+│
+├── Step-by-step:
+│   ├── 1. Construct baseline: zeros of shape [B, Freq, d]
+│   ├── 2. Compute DeepLIFT attributions:
+│   │     attributions = DeepLift.attribute(inputs=x_input, baselines=0, target=target_labels)
+│
+└── Outputs:
+    └── attributions: Tensor [B, Freq, d]        # Token-level importance maps
+"""

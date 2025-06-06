@@ -16,9 +16,8 @@ Given:
 
 the contribution of each feature is:
 
-$$
-\text{Contribution}_i = \frac{f(x) - f(x_0)}{x_i - x_{0,i}} \cdot (x_i - x_{0,i})
-$$
+$ \text{Contribution}_i = \frac{f(x) - f(x_0)}{x_i - x_{0,i}} \cdot (x_i - x_{0,i}) $
+
 
 This gives per-feature relevance scores.
 
