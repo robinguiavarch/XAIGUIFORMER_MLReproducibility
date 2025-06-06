@@ -14,7 +14,7 @@ preprocessing:
   line_frequency: 50  
   path:
     electrode_locations: standard_1020  # EEG system electrode locations (montage standard MNE) 
-    data_dir: data/TDBRAIN/raw       # chemin vers le dataset brut (ajouter ../ devant data si ça ne fonctionne pas)
+    data_dir: data/TDBRAIN/raw       # chemin vers le dataset brut
     save_dir: data/TDBRAIN/preprocessed  # chemin pour sauvegarder les EEG prétraités
   ica:  # ICA parameters
     n_components: 20
