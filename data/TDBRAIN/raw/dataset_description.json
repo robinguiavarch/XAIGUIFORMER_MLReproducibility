@@ -1,0 +1,16 @@
+{
+    "Name": "TD-BRAIN-SAMPLE (N=20), BVA format",
+    "BIDSVersion": "1.6.0",
+    "DatasetType": "raw",
+    "License": "See the DUA you signed before download",
+    "Authors": [
+        "Hanneke van Dijk",
+        "Guido van Wingen",
+        "Rosalinde van Ruth",
+        "Damiaan Denys",
+        "Martijn Arns"
+    ],
+    "Acknowledgements": "We acknowledge the support of many (PhD)students, test-assistants, and researchers that have assisted in the collection of this dataset over the last 20 years, in particular Erica Heesen, Hanneke Friesen, Desiree Spronk, Rik van Dinteren, Lana Donse, Tabitha Iseger, Noralie Krepel, Charlotte Roelofs, Helena Voetterl; many clinicians for support in, and collecting the clinical data, in particular Rosalinde van Ruth, Rien Breteler, Aukje Bootsma, Sabine de Ridder, Floor Thomassen, Anne Roovers, Dianne Winkelmolen, Vera Kruiver, Myrthe van Eerdt and neuroCare Group; Chris Spooner, Donna Palmer and Kamran Fallahpour for their support in the many projects conducted, BIAL Foundation for support in project 163/04; Aristide (Hans) Esser for his support in the SMC cohort, Mateo di Bardeci for reviewing the code and Evian Gordon for his vision and inspiration on integrative neuroscience and standardization that were fundamental to this dataset",
+    "HowToAcknowledge": "provide a link to www.brainclinics.com/resources or https://www.synapse.org/TDBRAIN and include a reference to the van Dijk et al. (2021) publication",
+    "DatasetDOI": "10.7303/syn25671079"
+}

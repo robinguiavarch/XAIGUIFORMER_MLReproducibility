@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "eeg-analysis"
+version = "0.1.0"
+description = "Analyse EEG avec ICA automatique"
+authors = ["Darryl Dessalines <dessalines.darryl@gmail.com>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.10"
+mne = "1.7.0"
+mne-connectivity = "0.4.0"
+mne-icalabel = "0.7.0"
+pandas = "^2.2.3"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
