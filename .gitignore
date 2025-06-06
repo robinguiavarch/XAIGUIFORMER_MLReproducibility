@@ -19,3 +19,8 @@ tensorboard/
 
 # notebooks
 *.ipynb
+
+# Images
+*.jpg
+*.jpeg
+*.png
