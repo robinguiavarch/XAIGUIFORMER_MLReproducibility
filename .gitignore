@@ -2,6 +2,7 @@
 .env
 .venv/
 __pycache__/
+eeg-venv/
 
 # Poetry
 poetry.lock
