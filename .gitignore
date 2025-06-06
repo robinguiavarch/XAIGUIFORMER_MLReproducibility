@@ -16,3 +16,6 @@ tensorboard/
 
 # Systems
 .DS_Store
+
+# notebooks
+.ipynb
