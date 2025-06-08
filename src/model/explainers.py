@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 from captum.attr import DeepLift
 
-class Explainer:
+class DeepLiftExplainer:
     """
     XAI Explainer using DeepLIFT from Captum.
     Applies DeepLIFT on the Vanilla Transformer to get token-level importances.
