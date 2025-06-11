@@ -8,9 +8,15 @@ accuracy, F1-score (macro/weighted), matrice de confusion et classification repo
 
 import torch
 from sklearn.metrics import accuracy_score, f1_score, classification_report, confusion_matrix
+from sklearn.utils.multiclass import unique_labels
 import numpy as np
 import json
 import os
+import warnings
+
+# Ignore les avertissements de Captum liés aux hooks non linéaires
+warnings.filterwarnings("ignore", message="Setting forward, backward hooks and attributes on non-linear")
+
 
 def evaluate(model, loader, class_names=None, device="cpu", save_path=None, epoch=None):
     """
@@ -37,7 +43,10 @@ def evaluate(model, loader, class_names=None, device="cpu", save_path=None, epoc
             y_true = batch.y
             age = batch.age.view(-1, 1)
             gender = batch.gender.view(-1, 1)
-            freq_bounds = batch.freq_bounds[0]
+            freq_bounds = batch.freq_bounds
+            if freq_bounds.dim() == 1:
+                freq_bounds = freq_bounds.unsqueeze(0)
+
 
             logits_coarse, logits_refined = model(batch, freq_bounds, age, gender, y_true=None)
             preds = logits_refined.argmax(dim=1)
@@ -48,7 +57,16 @@ def evaluate(model, loader, class_names=None, device="cpu", save_path=None, epoc
     accuracy = accuracy_score(all_targets, all_preds)
     f1_macro = f1_score(all_targets, all_preds, average="macro")
     f1_weighted = f1_score(all_targets, all_preds, average="weighted")
-    report = classification_report(all_targets, all_preds, target_names=class_names, zero_division=0, output_dict=True)
+    labels_used = list(unique_labels(all_targets, all_preds))
+
+    report = classification_report(
+        all_targets,
+        all_preds,
+        labels=labels_used,
+        target_names=[class_names[i] for i in labels_used],
+        zero_division=0,
+        output_dict=True
+    )
     cm = confusion_matrix(all_targets, all_preds)
 
     result = {

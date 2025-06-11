@@ -15,16 +15,15 @@ class XaiGuiFormer(nn.Module):
         self.config = config
 
         # === Dimensions du modèle ===
-        self.embedding_dim = config["model"]["embedding_dim"]
-        self.num_heads = config["model"]["num_heads"]
-        self.num_layers = config["model"]["num_layers"]
-        self.dropout = config["model"]["dropout"]
-        self.alpha = config["loss"].get("alpha", 0.5)
-        self.num_classes = config["model"]["num_classes"]
+        self.embedding_dim = config.model.dim_node_feat
+        self.num_heads = config.model.num_head
+        self.num_layers = config.model.num_transformer_layer
+        self.dropout = config.model.dropout
+        self.num_classes = config.model.num_classes
 
         # === Modules ===
         self.gnn = EEGConnectomeGNN(
-            input_dim=config["model"]["num_node_feat"],
+            input_dim=config.model.num_node_feat,
             hidden_dim=self.embedding_dim,
             num_classes=self.num_classes
         )
@@ -50,7 +49,11 @@ class XaiGuiFormer(nn.Module):
             weights = compute_class_weights(training_graphs)
         else:
             weights = None
+        self.alpha = config.train.criterion.alpha
         self.loss_fn = XAIGuidedLoss(alpha=self.alpha, class_weights=weights)
+
+        # === Projection des tokens depuis 528 → 128 ===
+        self.token_projection = nn.Linear(in_features=528, out_features=self.embedding_dim)
 
         # === Projections pour Query et Key ===
         self.W_q = nn.Linear(self.embedding_dim, self.embedding_dim)
@@ -66,7 +69,7 @@ class XaiGuiFormer(nn.Module):
     def forward(self, data, freq_bounds, age, gender, y_true=None):
         """
         Args:
-            data        : batch de graphes (PyG) → servira au GNN
+            data        : batch de graphes (PyG) → contient x_tokens
             freq_bounds : [Freq, 2]
             age         : [B, 1]
             gender      : [B, 1]
@@ -76,7 +79,11 @@ class XaiGuiFormer(nn.Module):
         """
 
         # 1. GNN → extraction de tokens connectome pour chaque bande f
-        x_raw = data.x_tokens  # [B, Freq, d], déjà calculé par un tokenizer externe (ou à adapter)
+        x_raw = data.x_tokens  # [B, Freq, 528] ou [Freq, 528] si batch size = 1
+        if x_raw.dim() == 2:
+            x_raw = x_raw.unsqueeze(0)  # [Freq, 528] → [1, Freq, 528]
+
+        x_raw = self.token_projection(x_raw)  # [B, Freq, 128]
 
         # 2. dRoFE sur Q/K
         q = self.W_q(x_raw)
@@ -91,7 +98,7 @@ class XaiGuiFormer(nn.Module):
 
         # 4. Explainer DeepLIFT (utilise logits coarse pour extraire importance)
         if y_true is not None:
-            q_expl = self.explainer.get_explanations(q_rot, y_true)
+            q_expl = self.explainer.get_explanations(q_rot, y_true, freq_bounds, age, gender)
             k_expl = self.explainer.get_explanations(k_rot, y_true)
         else:
             q_expl = q_rot.detach()

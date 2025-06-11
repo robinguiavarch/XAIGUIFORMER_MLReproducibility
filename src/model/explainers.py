@@ -4,62 +4,67 @@ import torch
 import torch.nn as nn
 from captum.attr import DeepLift
 
-class DeepLiftExplainer:
-    """
-    XAI Explainer using DeepLIFT from Captum.
-    Applies DeepLIFT on the Vanilla Transformer to get token-level importances.
 
-    Used to compute Q_expl and K_expl as required by the XAI-Guided Transformer.
+class ForwardWrapper(nn.Module):
     """
-
-    def __init__(self, model, target_layer="vanilla_transformer"):
-        """
-        Args:
-            model: The full model (Trainer instance) containing vanilla transformer
-            target_layer: str, name of the attribute to explain (usually 'vanilla_transformer')
-        """
+    Wrapper autour du forward simplifié à utiliser avec Captum.
+    """
+    def __init__(self, model):
+        super().__init__()
         self.model = model
-        self.target_layer = getattr(model, target_layer)
-        self.embedding_dim = model.embedding_dim
-        self.num_classes = model.classifier_coarse.out_features
+        self.target_layer = model.vanilla_transformer
+        self.classifier = model.classifier_coarse
 
-        self.explainer = DeepLift(self.forward_fn)
-
-    def forward_fn(self, x_input):
+    def forward(self, x_input, freq_bounds=None, age=None, gender=None):
         """
-        Isolated forward pass for DeepLift attribution.
-        This passes x_input through vanilla transformer → classifier_coarse
-
         Args:
-            x_input: [B, Freq, d]
+            x_input: Tensor [B, Freq, d]
         Returns:
-            logits: [B, C]
+            logits: Tensor [B, C]
         """
-        x_out = self.target_layer(x_input)  # [B, Freq, d]
-        pooled = x_out.mean(dim=1)          # mean-pooling
-        logits = self.model.classifier_coarse(pooled)  # [B, C]
+        x_out = self.target_layer(x_input)
+        pooled = x_out.mean(dim=1)
+        logits = self.classifier(pooled)
         return logits
 
-    def get_explanations(self, input_tensor, target_labels):
-        """
-        Applies DeepLIFT to compute attributions on input_tensor.
 
+class DeepLiftExplainer:
+    """
+    Explainer XAI basé sur Captum DeepLIFT.
+    Applique DeepLIFT sur la sortie du VanillaTransformer.
+    """
+
+    def __init__(self, model):
+        """
         Args:
-            input_tensor: [B, Freq, d] — input embeddings (e.g., q_rot or k_rot)
-            target_labels: [B] — class labels
+            model: Instance du modèle XaiGuiFormer complet
+        """
+        self.model = model
+        self.forward_module = ForwardWrapper(model)
+        self.explainer = DeepLift(self.forward_module)
+
+    def get_explanations(self, input_tensor, target, freq_bounds=None, age=None, gender=None):
+        """
+        Args:
+            input_tensor : Tensor [B, Freq, d]
+            target       : Tensor [B]
+            freq_bounds  : Tensor [Freq, 2]
+            age          : Tensor [B, 1]
+            gender       : Tensor [B, 1]
 
         Returns:
-            attributions: [B, Freq, d]
+            attributions : Tensor [B, Freq, d]
         """
-        # Generate baseline (zero vector of same shape)
-        baseline = torch.zeros_like(input_tensor)
+        input_tensor = input_tensor.detach().clone().requires_grad_(True)
 
-        # Compute DeepLIFT attributions
-        attributions = self.explainer.attribute(inputs=input_tensor,
-                                                baselines=baseline,
-                                                target=target_labels)
+        attributions = self.explainer.attribute(
+            inputs=input_tensor,
+            target=target,
+            additional_forward_args=(freq_bounds, age, gender)
+        )
 
-        return attributions.detach()
+        return attributions
+
 
 """"
 Explainer/
