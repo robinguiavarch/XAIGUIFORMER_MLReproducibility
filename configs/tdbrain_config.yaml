@@ -8,12 +8,12 @@ dataset: TDBRAIN
 ######################################
 preprocessing:
   n_workers: 4
-  n_jobs: null  # or ~
+  n_jobs: null  
   l_freq: 1     # high pass frequency
   h_freq: 45    # low pass frequency
   line_frequency: 50  
   path:
-    electrode_locations: standard_1020  # EEG system electrode locations (montage standard MNE)
+    electrode_locations: standard_1020  # EEG system electrode locations (montage standard MNE) 
     data_dir: data/TDBRAIN/raw       # chemin vers le dataset brut
     save_dir: data/TDBRAIN/preprocessed  # chemin pour sauvegarder les EEG prétraités
   ica:  # ICA parameters
@@ -35,8 +35,9 @@ connectome:
     mid_beta: [18., 21.]
     high_beta: [21., 30.]
     gamma: [30., 45.]
-    beta: [12., 30.]  # used for theta/beta ratio FC
+    beta: [12., 30.]  # used for theta/beta ratio (TBR)
   methods: ['coh', 'wpli']
   path:
     data_dir: data/TDBRAIN/preprocessed  # chemin vers les EEG prétraités
     save_dir: data/TDBRAIN/connectome    # chemin pour sauvegarder les connectomes
+

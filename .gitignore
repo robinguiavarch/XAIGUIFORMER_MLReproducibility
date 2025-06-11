@@ -16,3 +16,11 @@ tensorboard/
 
 # Systems
 .DS_Store
+
+# notebooks
+*.ipynb
+
+# Images
+*.jpg
+*.jpeg
+*.pngeeg-venv/
