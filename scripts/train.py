@@ -30,27 +30,54 @@ def load_graph_dataset(pickle_path):
 
 
 def train(model, loader, optimizer, device):
-    """Boucle d'entraînement sur un DataLoader PyG"""
+    """Boucle d'entraînement avec logging détaillé en cas d'erreur numérique"""
     model.train()
     total_loss = 0.
 
-    for batch in loader:
+    for i, batch in enumerate(loader):
         batch = batch.to(device)
 
-        optimizer.zero_grad()
-        loss = model(
-            batch,
-            batch.freq_bounds.unsqueeze(0) if batch.freq_bounds.dim() == 1 else batch.freq_bounds,
-            batch.age.view(-1, 1),
-            batch.gender.view(-1, 1),
-            batch.y
-        )
-        loss.backward()
-        optimizer.step()
+        # === Préparation des inputs
+        freq_bounds = batch.freq_bounds
+        if freq_bounds.dim() == 1:
+            freq_bounds = freq_bounds.unsqueeze(0)
+        age = batch.age.view(-1, 1)
+        gender = batch.gender.view(-1, 1)
+        y_true = batch.y
 
-        total_loss += loss.item()
+        optimizer.zero_grad()
+
+        # === Forward
+        try:
+            loss = model(batch, freq_bounds, age, gender, y_true)
+
+            if torch.isnan(loss):
+                print("[Batch", i, "] Loss is NaN")
+                print("y_true:", y_true)
+                print("y_true dtype:", y_true.dtype)
+                print("freq_bounds:", freq_bounds.shape)
+                print("age:", age[:5])
+                print("gender:", gender[:5])
+                print("x_tokens mean:", batch.x_tokens.mean().item())
+                print("x_tokens std:", batch.x_tokens.std().item())
+                exit()
+
+            # === Backward
+            loss.backward()
+
+            # === Gradient clipping
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+
+            optimizer.step()
+            total_loss += loss.item()
+
+        except Exception as e:
+            print(f"Exception in batch {i}: {e}")
+            torch.save(batch, f"debug_batch_{i}.pt")
+            raise e  # rethrow to debug
 
     return total_loss / len(loader)
+
 
 
 if __name__ == "__main__":

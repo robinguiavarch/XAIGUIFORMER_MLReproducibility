@@ -27,7 +27,9 @@ def load_labels(tsv_path="data/TDBRAIN/raw/participants.tsv"):
     df["label"] = le.fit_transform(df["indication"])
 
     # Normaliser le genre (ex: M/F en 0/1)
-    df["gender"] = df["gender"].map({"M": 1.0, "F": 0.0})
+        # Ne pas mapper à nouveau si la colonne est déjà numérique
+    if df["gender"].dtype == object:
+        df["gender"] = df["gender"].map({"M": 1.0, "F": 0.0})
 
     # Créer mapping pour chaque attribut
     label_map = dict(zip(df["participant_id"], df["label"]))
