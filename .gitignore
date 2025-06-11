@@ -2,6 +2,7 @@
 .env
 .venv/
 __pycache__/
+eeg-venv/
 
 # Poetry
 poetry.lock
@@ -15,3 +16,11 @@ tensorboard/
 
 # Systems
 .DS_Store
+
+# notebooks
+*.ipynb
+
+# Images
+*.jpg
+*.jpeg
+*.png
