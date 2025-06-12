@@ -50,6 +50,7 @@ _C.connectome.frequency_band.low_beta = [12., 18.]
 _C.connectome.frequency_band.mid_beta = [18., 21.]
 _C.connectome.frequency_band.high_beta = [21., 30.]
 _C.connectome.frequency_band.gamma = [30., 45.]
+_C.connectome.frequency_band.beta = [12., 30.] 
 _C.connectome.frequency_band.theta_beta_ratio = [4., 30.]  # ✅ AJOUTÉ : θ/β ratio (très important selon l'article)
 
 _C.connectome.methods = ['coh', 'wpli']
