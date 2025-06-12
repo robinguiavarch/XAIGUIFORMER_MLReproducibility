@@ -80,6 +80,11 @@ def preprocessing(EEG_raw, config, verbose=True):
 
     n_step += 1
     if verbose:
+        print(f'Step {n_step}: Resampling to 250 Hz...')
+    EEG_bandpass = EEG_bandpass.resample(250, npad="auto")
+
+    n_step += 1
+    if verbose:
         print(f'Step {n_step}: Segmenting into epochs...')
     picked_events_onset = EEG_bandpass.custom_events
     if abs(EEG_bandpass.info['sfreq'] - 500) < 1e-6 or abs(EEG_bandpass.info['sfreq'] - 512) < 1e-6:

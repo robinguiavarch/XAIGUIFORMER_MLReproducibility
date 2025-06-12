@@ -24,3 +24,10 @@ tensorboard/
 *.jpg
 *.jpeg
 *.pngeeg-venv/
+
+.gitattibutes
+.gitmodules
+
+# Fichiers debug
+debug_*
+fix_*

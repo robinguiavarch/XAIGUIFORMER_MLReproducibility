@@ -101,6 +101,7 @@ if __name__ == "__main__":
     print(f"Chargement des graphes depuis : {INPUT_PATH}")
     with open(INPUT_PATH, "rb") as f:
         graphs = pickle.load(f)
+    print(graphs[0])
 
     print(f"{len(graphs)} graphes chargés. Agrégation en cours...")
     xai_graphs = aggregate_graphs(graphs)
