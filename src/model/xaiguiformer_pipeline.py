@@ -1,7 +1,3 @@
-"""
-src/model/xaiguiformer_pipeline.py - PIPELINE PRINCIPAL avec explainer corrigé - NOMS ORIGINAUX
-"""
-
 import torch
 import torch.nn as nn
 
@@ -16,14 +12,17 @@ class XaiGuiFormer(nn.Module):
         super().__init__()
         self.config = config
 
-        # Dimensions du modèle
         self.embedding_dim = config.model.dim_node_feat
         self.num_heads = config.model.num_head
         self.num_layers = config.model.num_transformer_layer
         self.dropout = config.model.dropout
         self.num_classes = config.model.num_classes
 
-        # ConnectomeEncoder (GNN)
+        # Ablation flags
+        self.use_xai_guidance = config.model.use_xai_guidance
+        self.use_drofe = config.model.use_drofe
+        self.use_demographics = config.model.use_demographics
+
         self.connectome_encoder = ConnectomeEncoder(
             node_in_features=config.model.num_node_feat,
             edge_in_features=config.model.num_edge_feat,
@@ -36,7 +35,6 @@ class XaiGuiFormer(nn.Module):
             num_freqband=9
         )
 
-        # ✅ Transformer compatible Captum avec nom original
         self.shared_transformer = SharedTransformerEncoder(
             embedding_dim=self.embedding_dim,
             num_heads=self.num_heads,
@@ -44,86 +42,74 @@ class XaiGuiFormer(nn.Module):
             dropout=self.dropout
         )
 
-        # Loss avec pondération des classes
         if training_graphs is not None:
             weights = compute_class_weights(training_graphs)
         else:
             weights = None
+
         self.alpha = config.train.criterion.alpha
         self.loss_fn = XAIGuidedLoss(alpha=self.alpha, class_weights=weights)
 
-        # Têtes de classification
         self.classifier_coarse = nn.Linear(self.embedding_dim, self.num_classes)
         self.classifier_refined = nn.Linear(self.embedding_dim, self.num_classes)
 
-        # ✅ Explainer compatible Captum avec nom original
-        self.explainer = None  # Initialisé après premier forward
+        self.explainer = None
 
     def _init_explainer_if_needed(self):
-        """Initialise l'explainer compatible Captum"""
         if self.explainer is None:
             self.explainer = MultiLayerDeepLiftExplainer(self)
-            print("✅ MultiLayerDeepLiftExplainer initialized")
+            print("MultiLayerDeepLiftExplainer initialized")
 
     def _combine_demographics(self, age, gender):
-        """Combine age et gender en demographic_info"""
         return torch.cat([age, gender], dim=1)  # [B, 2]
 
     def forward(self, data, freq_bounds, age, gender, y_true=None):
-        """
-        ✅ FORWARD CORRIGÉ avec explainer Captum compatible
-        """
         B = age.shape[0] if age.dim() > 0 else 1
-        demographic_info = self._combine_demographics(age, gender)
-        
-        # Step 1: ConnectomeEncoder 
+
+        demographic_info = (
+            self._combine_demographics(age, gender) if self.use_demographics else None
+        )
+        freq_bounds_in = freq_bounds if self.use_drofe else None
+
+        # === Step 1: Tokenization
         x_embeddings = self.connectome_encoder(data)  # [B, Freq, d]
-        
-        # Step 2: Premier passage - Standard
+
+        # === Step 2: First pass (Vanilla Transformer)
         x_coarse = self.shared_transformer(
-            x_embeddings, 
-            freq_bounds, 
-            demographic_info, 
+            x_embeddings,
+            freq_bounds=freq_bounds_in,
+            demographic_info=demographic_info,
             explanations=None,
             mode='standard'
         )
         logits_coarse = self.classifier_coarse(x_coarse.mean(dim=1))
-        
-        # Step 3: Explainer ✅ NOUVEAU FORMAT
+
+        # === Step 3: Explainability (DeepLIFT)
         explanations = None
-        if y_true is not None:
+        if self.use_xai_guidance and y_true is not None:
             self._init_explainer_if_needed()
             try:
                 explanations = self.explainer.get_explanations(
-                    x_embeddings, y_true, freq_bounds, age, gender
+                    x_embeddings, y_true,
+                    freq_bounds if self.use_drofe else None,
+                    age if self.use_demographics else None,
+                    gender if self.use_demographics else None
                 )
-                print(f"✅ Generated {len(explanations)} layer explanations")
+                print(f"Generated {len(explanations)} layer explanations")
             except Exception as e:
-                print(f"Warning: Explainer failed: {e}")
+                print(f"⚠️ Explainer failed: {e}")
                 explanations = None
-        
-        # Step 4: Deuxième passage - XAI-guided
-        if explanations is not None:
-            # ✅ NOUVEAU : Utiliser explanations directement dans le transformer
-            x_refined = self.shared_transformer(
-                x_embeddings,
-                freq_bounds=None,
-                demographic_info=None,
-                explanations=explanations,
-                mode='xai_guided'
-            )
-        else:
-            # Mode fallback si pas d'explanations
-            x_refined = self.shared_transformer(
-                x_embeddings,
-                freq_bounds=None,
-                demographic_info=None,
-                explanations=None,
-                mode='xai_guided'
-            )
-            
+
+        # === Step 4: Second pass (XAI-guided)
+        x_refined = self.shared_transformer(
+            x_embeddings,
+            freq_bounds=None,
+            demographic_info=None,
+            explanations=explanations if self.use_xai_guidance else None,
+            mode='xai_guided'
+        )
         logits_refined = self.classifier_refined(x_refined.mean(dim=1))
-        
+
         if y_true is not None:
             return self.loss_fn(logits_coarse, logits_refined, y_true)
         else:

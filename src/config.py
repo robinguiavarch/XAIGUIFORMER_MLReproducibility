@@ -82,6 +82,11 @@ _C.model.droppath = 0.
 _C.model.token_input_dim = 528  # ✅ NOUVEAU: dimension réelle des x_tokens  
 _C.model.estimated_electrodes = 34  # ✅ NOUVEAU: basé sur diagnostic
 
+# ✅ AJOUTS POUR ABLATION STUDY
+_C.model.use_xai_guidance = True       
+_C.model.use_drofe = True                
+_C.model.use_demographics = True  
+
 ######################################################
 # train settings (✅ CORRIGÉS selon Table 9 de l'article)
 ######################################################
