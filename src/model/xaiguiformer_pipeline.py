@@ -105,6 +105,8 @@ class XaiGuiFormer(nn.Module):
             k_expl = k_rot.detach()
 
         # 5. XAI-guided Transformer
+        q_expl = self.drofe(q_expl, freq_bounds, age, gender) #++
+        k_expl = self.drofe(k_expl, freq_bounds, age, gender) #++
         x_refined = self.xai_transformer(x_raw, q_expl, k_expl)
         logits_refined = self.classifier_refined(x_refined.mean(dim=1))
 
