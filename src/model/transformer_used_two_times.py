@@ -60,7 +60,11 @@ class SharedTransformerLayer(nn.Module):
 
         attn_scores = torch.matmul(q_rot, k_rot.transpose(-2, -1)) / (self.head_dim ** 0.5)
         attn_weights = torch.softmax(attn_scores, dim=-1)
+        self.attn_weights_cache = attn_weights.detach()
+
         attn_weights = self.attn_dropout(attn_weights)
+
+        self.attn_weights_cache = attn_weights.clone().detach()
 
         attn_output = torch.matmul(attn_weights, v)
         attn_output = attn_output.transpose(1, 2).contiguous().view(B, Freq, d)

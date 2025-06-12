@@ -12,7 +12,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src"
 from config import get_cfg_defaults
 from model.xaiguiformer_pipeline import XaiGuiFormer
 
-# === Fonctions utilitaires ===
+
+# === Fonctions ===
 
 def load_graph_dataset(pickle_path):
     with open(pickle_path, "rb") as f:
@@ -20,7 +21,8 @@ def load_graph_dataset(pickle_path):
 
 def extract_attention_hook(attn_weights_list):
     def hook(module, input, output):
-        attn_weights_list.append(output.detach().cpu())
+        if hasattr(module, 'attn_weights_cache'):
+            attn_weights_list.append(module.attn_weights_cache.detach().cpu())
     return hook
 
 def plot_attention(attn_matrix, title, save_path):
@@ -33,6 +35,7 @@ def plot_attention(attn_matrix, title, save_path):
     plt.savefig(save_path)
     plt.close()
 
+
 # === Script principal ===
 
 if __name__ == "__main__":
@@ -43,7 +46,7 @@ if __name__ == "__main__":
     # === Chargement du dataset
     graph_path = os.path.join(cfg.connectome.path.save_dir, "connectomes_graphs.pkl")
     all_graphs = load_graph_dataset(graph_path)
-    test_graphs = all_graphs[-32:]  # pour debug/visu rapide
+    test_graphs = all_graphs[-32:]  # échantillons pour debug/visualisation
     loader = DataLoader(test_graphs, batch_size=1, shuffle=False)
 
     # === Label encoding
@@ -60,14 +63,13 @@ if __name__ == "__main__":
     model.to(device)
     model.eval()
 
-    # === Hooks d’attention
+    # === Hooks d’attention sur les couches
     vanilla_attns, xai_attns = [], []
-    for layer in model.vanilla_transformer.layers:
-        layer.self_attn.register_forward_hook(extract_attention_hook(vanilla_attns))
-    for layer in model.xai_transformer.layers:
-        layer.register_forward_hook(extract_attention_hook(xai_attns))
+    for layer in model.shared_transformer.layers:
+        # On capture le mode standard et XAI-guided grâce à la structure à deux passages
+        layer.register_forward_hook(extract_attention_hook(vanilla_attns))
 
-    # === Forward + visu
+    # === Forward + Visualisation
     for i, batch in enumerate(loader):
         batch = batch.to(device)
         age = batch.age.view(-1, 1)
@@ -78,19 +80,12 @@ if __name__ == "__main__":
             model(batch, freq_bounds, age, gender, y_true=batch.y)
 
         if vanilla_attns:
-            v_attn = vanilla_attns[0][0][0]  # [Freq, Freq]
+            attn_tensor = vanilla_attns[-1][0].mean(dim=0)  # Moyenne sur les têtes : [Freq, Freq]
             plot_attention(
-                v_attn,
-                f"Vanilla Attention - Sample {i}",
-                os.path.join(cfg.out_root, "attention_maps", f"vanilla_attn_{i}.png")
-            )
-        if xai_attns:
-            x_attn = xai_attns[0][0][0]  # [Freq, Freq]
-            plot_attention(
-                x_attn,
-                f"XAI-guided Attention - Sample {i}",
-                os.path.join(cfg.out_root, "attention_maps", f"xai_attn_{i}.png")
+                attn_tensor,
+                f"Final Attention Layer - Sample {i}",
+                os.path.join(cfg.out_root, "attention_maps", f"attn_sample_{i}.png")
             )
 
+        # Clear pour le prochain passage
         vanilla_attns.clear()
-        xai_attns.clear()
