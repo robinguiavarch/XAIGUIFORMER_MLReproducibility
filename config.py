@@ -105,7 +105,7 @@ _C.model.gnn_type = 'GINEConv'
 # the number of gnn layer
 _C.model.num_gnn_layer = 4
 # the number of transformer layer
-_C.model.num_transformer_layer = 4
+_C.model.num_transformer_layer = 12
 # explainable artificial intelligence algorithm type
 _C.model.explainer_type = 'DeepLift'
 # drop out rate
@@ -148,7 +148,7 @@ _C.train.lr_scheduler.warmup_lr = 1e-5
 # loss function
 _C.train.criterion = CN()
 _C.train.criterion.smoothing = 0.1
-_C.train.criterion.alpha = 1.
+_C.train.criterion.alpha = 0.7
 
 ######################################################
 # augmentation settings
