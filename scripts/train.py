@@ -301,7 +301,7 @@ if __name__ == "__main__":
     cfg.model.num_classes = num_classes
     cfg.freeze()
 
-    try:
+    try: # add flag false
         model = XaiGuiFormer(config=cfg, training_graphs=train_graphs).to(device)
         total_params = sum(p.numel() for p in model.parameters())
         trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -341,7 +341,7 @@ if __name__ == "__main__":
     train_losses = []
     val_metrics = []
 
-    for epoch in range(1, max_epochs + 1):
+    for epoch in range(1, max_epochs + 1): # add flag xaigui
         print(f"\n{'='*100}")
         print(f"EPOCH {epoch}/{max_epochs}")
         print(f"{'='*100}")

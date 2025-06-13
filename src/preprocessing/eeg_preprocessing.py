@@ -1,154 +1,178 @@
 """
-Ce script est un copier-coller fidèle de la méthode de prétraitement EEG décrite dans l'article de référence.
-Il utilise le pipeline PREP (détection des canaux bruyants, interpolation), le filtrage, la segmentation en epochs
-basée sur les événements "yeux fermés", l'ICA avec étiquetage automatique des composantes (ICLabel), 
-et la re-référence moyenne finale.
-
-Le but est de préparer les données EEG pour une analyse de connectivité (connectomes).
+EEG preprocessing script for CSV-formatted RestEC (eyes closed) data.
+Implements PREP pipeline, filtering, ICA, epoching, and average referencing.
 """
 
 import os
+import sys
 import mne
 import numpy as np
+import pandas as pd
 import mne_icalabel
-import sys
-sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
-from config import get_cfg_defaults
 from pyprep.prep_pipeline import PrepPipeline
 
-def custom_read_raw_brainvision(fname, montage, phenotype, preload=True):
+# === Configuration import ===
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../src")))
+from config import get_cfg_defaults
+
+
+def custom_read_raw_csv(fname, montage, phenotype, preload=True):
     """
-    Charge un fichier EEG au format BrainVision avec les bons types de canaux,
+    Charge un fichier EEG au format CSV avec les bons types de canaux,
     le montage EEG standard et crée des événements "yeux fermés" artificiels.
+    """
+    import pandas as pd
+    from mne import create_info
+    from mne.io import RawArray
+
+    df = pd.read_csv(fname)
+    ch_names = df.columns.tolist()
+    sfreq = 250  # <- À adapter si ce n’est pas correct
+    data = df.values.T
+
+    info = create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
+    raw = RawArray(data, info)
+
+    # Marquer les canaux spéciaux comme non-EEG
+    special_types = {
+        'VPVA': 'eog', 'VNVB': 'eog',
+        'HPHL': 'eog', 'HNHR': 'eog',
+        'Erbs': 'ecg', 'OrbOcc': 'eog',
+        'Mass': 'emg'
+    }
+
+    # Vérifie lesquels de ces canaux sont présents et change leur type
+    present_specials = {k: v for k, v in special_types.items() if k in raw.ch_names}
+    raw.set_channel_types(present_specials)
+
+    # Montage seulement pour les canaux EEG
+    raw.set_montage(montage, on_missing='ignore')  # on_missing=‘ignore’ pour éviter l’erreur
+    raw.custom_events = mne.make_fixed_length_events(raw, id=30, start=0, stop=120, duration=40, overlap=20)
+    raw.custom_event_id = {'eyes close': 30}
+    raw.info['description'] = phenotype
+    return raw
+
+
+
+def preprocessing(raw, config, verbose=True):
+    """
+    Full preprocessing pipeline (PREP, filtering, epoching, ICA, reref).
 
     Args:
-        fname (str): Chemin vers le fichier .vhdr.
-        montage (mne.channels.DigMontage): Montage EEG.
-        phenotype (str): Nom du sujet ou description du phénotype.
-        preload (bool): Précharge ou non les données en mémoire.
+        raw (mne.io.Raw): Raw EEG object.
+        config: yacs config.
+        verbose (bool): Show progress.
 
     Returns:
-        raw (mne.io.Raw): Objet Raw EEG avec événements ajoutés.
-    """
-    EEG_raw = mne.io.read_raw_brainvision(fname, preload=preload)
-    channel_type = {'VPVA': 'eog', 'VNVB': 'eog',
-                    'HPHL': 'eog', 'HNHR': 'eog',
-                    'Erbs': 'ecg', 'OrbOcc': 'eog',
-                    'Mass': 'emg'}
-    EEG_raw.set_channel_types(channel_type)
-    EEG_raw.set_montage(montage)
-    EEG_raw.custom_events = mne.make_fixed_length_events(EEG_raw, id=30, start=0, stop=120, duration=40, overlap=20)
-    EEG_raw.custom_event_id = {'eyes close': 30}
-    EEG_raw.info['description'] = phenotype
-    return EEG_raw
-
-def preprocessing(EEG_raw, config, verbose=True):
-    """
-    Applique un pipeline complet de prétraitement EEG :
-    - Détection et interpolation des canaux brutés
-    - Filtrage bande-passante
-    - Découpage en epochs "yeux fermés"
-    - ICA + ICLabel pour suppression des artéfacts
-    - Re-référence moyenne
-
-    Args:
-        EEG_raw (mne.io.Raw): Enregistrement brut chargé.
-        config (CfgNode): Configuration globale.
-        verbose (bool): Affiche les étapes ou non.
-
-    Returns:
-        EEG_interp (mne.Epochs): Signal EEG prétraité.
+        raw: Preprocessed MNE Epochs object.
     """
     n_jobs = config.preprocessing.n_jobs
     n_step = 0
 
+    # === Step 1: PREP pipeline (bad channel interpolation)
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Detecting bad channels...')
-    prep_params = {"ref_chs": "eeg", "reref_chs": "eeg",
-                   "line_freqs": np.arange(config.preprocessing.line_frequency, EEG_raw.info['sfreq'] / 2, config.preprocessing.line_frequency)}
-    filter_kwargs = {"method": "fir", "n_jobs": n_jobs}
-    noisy_detector = PrepPipeline(EEG_raw, prep_params, EEG_raw.get_montage(),
-                                  channel_wise=True, filter_kwargs=filter_kwargs)
-    noisy_detector.fit()
-    EEG_raw.info['bads'] = noisy_detector.interpolated_channels
+        print(f"[Step {n_step}] Detecting bad channels...")
+    prep_params = {
+        "ref_chs": "eeg",
+        "reref_chs": "eeg",
+        "line_freqs": np.arange(
+            config.preprocessing.line_frequency,
+            raw.info['sfreq'] / 2,
+            config.preprocessing.line_frequency
+        )
+    }
+    prep = PrepPipeline(raw, prep_params, raw.get_montage(), channel_wise=True,
+                        filter_kwargs={"method": "fir", "n_jobs": n_jobs})
+    prep.fit()
+    raw.info['bads'] = prep.interpolated_channels
 
+    # === Step 2: Bandpass filter
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Filtering...')
-    EEG_bandpass = EEG_raw.filter(l_freq=config.preprocessing.l_freq, h_freq=config.preprocessing.h_freq, n_jobs=n_jobs)
+        print(f"[Step {n_step}] Bandpass filtering...")
+    raw.filter(l_freq=config.preprocessing.l_freq,
+               h_freq=config.preprocessing.h_freq, n_jobs=n_jobs)
 
+    # === Step 3: Resample
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Resampling to 250 Hz...')
-    EEG_bandpass = EEG_bandpass.resample(250, npad="auto")
+        print(f"[Step {n_step}] Resampling to 250 Hz...")
+    raw = raw.resample(250)
 
+    # === Step 4: Epoching eyes closed
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Segmenting into epochs...')
-    picked_events_onset = EEG_bandpass.custom_events
-    if abs(EEG_bandpass.info['sfreq'] - 500) < 1e-6 or abs(EEG_bandpass.info['sfreq'] - 512) < 1e-6:
-        EEG_eyes_close = mne.Epochs(EEG_bandpass, picked_events_onset, {'eyes close': 30}, baseline=None, tmin=5, tmax=35,
-                                    preload=True, reject=None, proj=False, decim=2)
-    else:
-        EEG_eyes_close = mne.Epochs(EEG_bandpass, picked_events_onset, {'eyes close': 30}, baseline=None, tmin=5, tmax=35,
-                                    preload=True, reject=None, proj=False)
+        print(f"[Step {n_step}] Creating epochs (eyes closed)...")
+    events = raw.custom_events
+    event_id = raw.custom_event_id
+    tmin, tmax = 5, 35
+    epochs = mne.Epochs(raw, events=events, event_id=event_id,
+                        tmin=tmin, tmax=tmax, baseline=None,
+                        preload=True, proj=False)
 
+    # === Step 5: ICA + ICLabel
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Applying ICA...')
-    nb_channels = len(mne.pick_types(EEG_eyes_close.info, eeg=True, exclude='bads'))
-    ica = mne.preprocessing.ICA(n_components=min(20, nb_channels),
-                                method=config.preprocessing.ica.method,
-                                fit_params=dict(config.preprocessing.ica.fit_params))
-    ica.fit(EEG_eyes_close)
-    ica.exclude = []
-    ic_info = mne_icalabel.label_components(EEG_eyes_close, ica, method='iclabel')
-    ic_probability, ic_labels = ic_info['y_pred_proba'], ic_info["labels"]
-    ica.exclude = [idx for idx, label in enumerate(ic_labels) if label not in ["brain", "other"] and ic_probability[idx] >= config.preprocessing.ica.ic_label_threshold]
-    print(f"Excluding ICA components: {np.array(ic_labels)[ica.exclude]}")
-    EEG_ica = ica.apply(EEG_eyes_close)
+        print(f"[Step {n_step}] Running ICA + ICLabel...")
+    n_channels = len(mne.pick_types(epochs.info, eeg=True, exclude='bads'))
+    ica = mne.preprocessing.ICA(
+        n_components=min(20, n_channels),
+        method=config.preprocessing.ica.method,
+        fit_params=dict(config.preprocessing.ica.fit_params)
+    )
+    ica.fit(epochs)
+    ic_info = mne_icalabel.label_components(epochs, ica, method='iclabel')
+    probs, labels = ic_info['y_pred_proba'], ic_info["labels"]
+    ica.exclude = [
+        idx for idx, label in enumerate(labels)
+        if label not in ["brain", "other"]
+        and probs[idx] >= config.preprocessing.ica.ic_label_threshold
+    ]
+    print(f"Excluding ICA components: {np.array(labels)[ica.exclude]}")
+    raw_ica = ica.apply(epochs)
 
+    # === Step 6: Interpolate
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Interpolating bad channels...')
-    EEG_interp = EEG_ica.interpolate_bads()
+        print(f"[Step {n_step}] Interpolating...")
+    raw_ica = raw_ica.interpolate_bads()
 
+    # === Step 7: Average reference
     n_step += 1
     if verbose:
-        print(f'Step {n_step}: Setting average reference...')
-    return EEG_interp.set_eeg_reference(ref_channels='average', ch_type='eeg')
+        print(f"[Step {n_step}] Re-referencing...")
+    return raw_ica.set_eeg_reference(ref_channels='average', ch_type='eeg')
+
 
 def preprocessingPipeline(fname, montage, phenotype, config, save_path):
     """
-    Exécute le pipeline complet de prétraitement EEG sur un fichier donné.
-    Sauvegarde le fichier `.fif` résultant à l’emplacement souhaité.
+    Run the full preprocessing pipeline from a CSV RestEC file.
 
     Args:
-        fname (str): Chemin vers le fichier EEG .vhdr.
-        montage (mne.channels.DigMontage): Montage EEG.
-        phenotype (str): Description du sujet.
-        config (CfgNode): Configuration générale.
-        save_path (str): Chemin de sauvegarde du fichier prétraité.
+        fname: Path to CSV.
+        montage: MNE DigMontage.
+        phenotype: Subject ID string.
+        config: Global config.
+        save_path: Where to write .fif
     """
-    EEG_raw = custom_read_raw_brainvision(fname, montage, phenotype)
-    if EEG_raw.info['description'] != 'bad':
-        EEG_prep = preprocessing(EEG_raw, config, verbose=False)
-        if not os.path.exists(save_path):
-            dir, _ = os.path.split(save_path)
-            os.makedirs(dir, exist_ok=True)
-        EEG_prep.save(save_path, fmt='double', overwrite=True)
+    raw = custom_read_raw_csv(fname, montage, phenotype)
+    if raw.info['description'] != 'bad':
+        processed = preprocessing(raw, config, verbose=False)
+        os.makedirs(os.path.dirname(save_path), exist_ok=True)
+        processed.save(save_path, fmt='double', overwrite=True)
     else:
-        print(f'({phenotype}) Data labeled as bad — skipping.')
+        print(f"[{phenotype}] Data labeled as bad — skipped.")
+
 
 if __name__ == "__main__":
     cfg = get_cfg_defaults()
     cfg.merge_from_file('configs/tdbrain_config.yaml')
     cfg.freeze()
 
-    f_eleloc = cfg.preprocessing.path.electrode_locations
-    data_dir = cfg.preprocessing.path.data_dir
+    data_dir = os.path.join(cfg.root, "raw", "derivatives")
     save_dir = cfg.preprocessing.path.save_dir
+    montage = mne.channels.make_standard_montage("standard_1020")
 
     for subj_dir in os.listdir(data_dir):
         subj_path = os.path.join(data_dir, subj_dir)
@@ -160,9 +184,8 @@ if __name__ == "__main__":
             continue
 
         for file in os.listdir(ses_path):
-            if file.endswith("_task-restEC_eeg.vhdr"):
-                file_base = file.replace("_task-restEC_eeg.vhdr", "")
+            if file.endswith("_task-restEC_eeg.csv"):
+                file_base = file.replace("_task-restEC_eeg.csv", "")
                 fname = os.path.join(ses_path, file)
-                montage = mne.channels.make_standard_montage("standard_1020")
                 save_path = os.path.join(save_dir, subj_dir, "ses-1", f'{file_base}_EC_epo.fif')
                 preprocessingPipeline(fname, montage, file_base, cfg, save_path)
