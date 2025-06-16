@@ -12,6 +12,12 @@ from utils.eval_metrics import eval_metrics
 
 # ==== SEED FIX FOR REPRODUCIBILITY ====
 def set_seed(seed):
+    """
+    Fix random seed for reproducibility across Python, NumPy, and PyTorch.
+
+    Args:
+        seed (int): The random seed value to use.
+    """
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
@@ -22,6 +28,17 @@ set_seed(42)
 
 # ======= CHUNKING FUNCTION =======
 def create_chunks_from_dataset(dataset, chunk_size=2000, overlap=0.5):
+    """
+    Split time series into overlapping chunks for model input.
+
+    Args:
+        dataset (Dataset): EEGFrequencyTokensDataset instance.
+        chunk_size (int): Length of each chunk.
+        overlap (float): Fraction of overlap between consecutive chunks.
+
+    Returns:
+        list: A list of FrequencyTokensData chunks.
+    """
     chunked_samples = []
     step_size = int(chunk_size * (1 - overlap))
     for sample in dataset:
@@ -29,7 +46,6 @@ def create_chunks_from_dataset(dataset, chunk_size=2000, overlap=0.5):
         tlen = freq.shape[2]
         for start in range(0, tlen - chunk_size + 1, step_size):
             chunked = freq[:, :, start:start + chunk_size]
-            # On retourne des objets FrequencyTokensData !
             chunked_samples.append(
                 FrequencyTokensData(
                     frequency_tokens=chunked,
@@ -41,20 +57,39 @@ def create_chunks_from_dataset(dataset, chunk_size=2000, overlap=0.5):
     return chunked_samples
 
 def custom_collate_fn(batch):
-    # batch: list of FrequencyTokensData
-    # on stacke chaque attribut individuellement (fréquence, labels, demo, eid)
+    """
+    Custom collation function for FrequencyTokensData.
+
+    Args:
+        batch (list): List of FrequencyTokensData objects.
+
+    Returns:
+        dict: Batched frequency tokens, labels, demographic info, and IDs.
+    """
     freq_tokens = torch.stack([x.frequency_tokens for x in batch])
     ys = torch.stack([x.y for x in batch])
     demo = torch.stack([x.demographic_info for x in batch])
     eids = [x.eid for x in batch]
     return {
-        "frequency_tokens": freq_tokens,      # [batch, 9, 33, chunk]
-        "y": ys,                              # [batch, 1]
-        "demographic_info": demo,             # [batch, 2]
+        "frequency_tokens": freq_tokens,
+        "y": ys,
+        "demographic_info": demo,
         "eid": eids
     }
 
 def create_training_data(root, chunk_size=2000, overlap=0.5, batch_size=16):
+    """
+    Create chunked train and validation DataLoaders.
+
+    Args:
+        root (str or Path): Root directory containing data.
+        chunk_size (int): Chunk length for time series.
+        overlap (float): Overlap between chunks.
+        batch_size (int): Batch size for DataLoader.
+
+    Returns:
+        tuple: (train_loader, val_loader)
+    """
     train_dataset = EEGFrequencyTokensDataset(root, "TDBRAIN", "train")
     val_dataset = EEGFrequencyTokensDataset(root, "TDBRAIN", "val")
 
@@ -82,6 +117,18 @@ def create_training_data(root, chunk_size=2000, overlap=0.5, batch_size=16):
 # ==== TRAINING AND EVAL LOOP ====
 @torch.no_grad()
 def evaluate(model, dataloader, device, num_classes):
+    """
+    Evaluate model performance on a validation set.
+
+    Args:
+        model (nn.Module): Trained model.
+        dataloader (DataLoader): Validation DataLoader.
+        device (torch.device): Device to run evaluation.
+        num_classes (int): Number of output classes.
+
+    Returns:
+        tuple: Average loss, BAC, AUC-PR, AUROC
+    """
     model.eval()
     total_loss, total_samples = 0, 0
     all_preds, all_labels = [], []
@@ -104,10 +151,10 @@ def evaluate(model, dataloader, device, num_classes):
     return avg_loss, bac, aucpr, auroc
 
 def main():
-    # Config
+    """
+    Main training loop for XAIguiFormerTimeSeries model.
+    """
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"🔥 Using device: {device}")
-
     project_root = Path(__file__).parent
     data_root = project_root / "data"
     batch_size = 16
@@ -116,12 +163,8 @@ def main():
     epochs = 3
     num_classes = 4
 
-    # Data loaders
-    print("📦 Loading data & chunking ...")
     train_loader, val_loader = create_training_data(data_root, chunk_size, overlap, batch_size)
-    print(f"✅ Training samples: {len(train_loader.dataset)} | Validation samples: {len(val_loader.dataset)}")
 
-    # Model
     freq_bands = get_frequency_bands_tensor()
     model = XAIguiFormerTimeSeries(
         num_channels=33,
@@ -138,17 +181,14 @@ def main():
         attn_drop=0.0,
         droppath=0.0
     ).to(device)
-    print(f"✅ Model ready: {sum(p.numel() for p in model.parameters() if p.requires_grad):,} trainable params")
 
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4, weight_decay=1e-5)
     criterion = torch.nn.CrossEntropyLoss()
 
     history = []
-
     best_val_bac, best_epoch = 0, 0
+
     for epoch in range(1, epochs + 1):
-        print(f"\n===== EPOCH {epoch}/{epochs} =====")
-        # ----- TRAIN -----
         model.train()
         total_loss, total_samples = 0, 0
         for batch in train_loader:
@@ -158,14 +198,6 @@ def main():
             labels = batch['y'].squeeze().long()
             optimizer.zero_grad()
             preds, _ = model(batch)
-            for k, v in batch.items():
-                if isinstance(v, torch.Tensor):
-                    if torch.isnan(v).any():
-                        print(f"NaN détecté dans {k} (entrée)")
-                    if torch.isinf(v).any():
-                        print(f"Inf détecté dans {k} (entrée)")
-            print("preds min/max:", preds.min().item(), preds.max().item())
-            print("labels:", labels)
             loss = criterion(preds, labels)
             loss.backward()
             optimizer.step()
@@ -173,10 +205,7 @@ def main():
             total_samples += labels.size(0)
         train_loss = total_loss / total_samples
 
-        # ----- EVAL -----
         val_loss, val_bac, val_aucpr, val_auroc = evaluate(model, val_loader, device, num_classes)
-        print(f"Train loss: {train_loss:.4f}")
-        print(f"Val   loss: {val_loss:.4f} | BAC: {val_bac:.4f} | AUC-PR: {val_aucpr:.4f} | AUROC: {val_auroc:.4f}")
 
         history.append({
             "epoch": epoch,
@@ -190,12 +219,8 @@ def main():
         if val_bac > best_val_bac:
             best_val_bac, best_epoch = val_bac, epoch
             torch.save(model.state_dict(), "best_xaiguiformer_timeseries.pt")
-            print("💾 Model saved (new best BAC!)")
 
-    print(f"\nTraining finished! Best val BAC: {best_val_bac:.4f} at epoch {best_epoch}")
-
-    # Tableau récapitulatif
-    print("\n=== Résumé des métriques sur 3 epochs ===")
+    print("\n=== Summary of Metrics ===")
     print("{:<6} {:<12} {:<12} {:<10} {:<12} {:<12}".format("Epoch", "Train loss", "Val loss", "BAC", "AUC-PR", "AUROC"))
     for row in history:
         print("{:<6} {:<12.4f} {:<12.4f} {:<10.4f} {:<12.4f} {:<12.4f}".format(

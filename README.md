@@ -17,46 +17,6 @@ This repository implements **XAIguiFormer_TimeSeries**, an extended variant of t
 - **Architectural Compatibility**: Drop-in replacement preserving all downstream XAI components
 - **Chunking Strategy**: Overlapping temporal windows for 3.2x data augmentation
 
-## Project Architecture
-XAIguiFormer/                         # root project directory
-├── configs/                          # configuration YAML files
-│   ├── TDBRAIN_model.yaml
-│   └── TDBRAIN_preprocess.yaml
-│
-├── data/                             # raw & processed data, and dataset generation scripts
-│   ├── TDBRAIN_participants_V2_data/          # folder containing raw patient metadata files
-│   ├── TDBRAIN_participants_V2.json
-│   ├── TDBRAIN_participants_V2.tsv
-│   ├── TDBRAIN_participants_V2.xlsx
-│   ├── TDBRAIN_replication_template_V2.xlsx
-│   ├── TDBRAIN_reduced/                       # (collapsed)
-│   ├── TDBRAIN_reduced_timeseries/           # (collapsed)
-│   ├── convert_xls_to_csv.py
-│   └── create_tdbrain_dataset_90.py          # script to build the dataset
-│
-├── models/                           # main model definitions
-│   ├── init.py
-│   └── xaiguiformer_timeseries.py
-│
-├── modules/                          # model submodules (tokenizer, transformer, XAI, etc.)
-│   ├── init.py
-│   ├── explainer_wrapper.py
-│   ├── explainer.py
-│   ├── multirocket_tokenizer.py
-│   ├── positional_encoding_wrapper.py
-│   └── transformer.py
-│
-├── utils/                            # utility scripts for preprocessing, evaluation, data handling
-│   ├── init.py
-│   ├── data_transformer_tensor_timeseries.py
-│   ├── eval_metrics.py
-│   └── preprocessing_timeseries.py
-│
-├── main_timeseries.py                # main training script
-├── poetry.lock                       # poetry environment lock file
-├── pyproject.toml                    # poetry configuration file
-└── README.md                         # project documentation
-
 ### Core Components
 
 #### Configuration Files (`configs/`)
