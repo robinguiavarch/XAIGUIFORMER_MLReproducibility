@@ -1,5 +1,5 @@
+import torch
 from torchmetrics.classification import MulticlassAUROC, MulticlassSpecificity, MulticlassRecall, MulticlassAveragePrecision
-
 
 def eval_metrics(preds, target, num_classes, device):
     # initial the metrics
@@ -9,10 +9,9 @@ def eval_metrics(preds, target, num_classes, device):
     auroc_metric = MulticlassAUROC(num_classes=num_classes, average='macro').to(device)
 
     # measure metrics
-    specificity = specificity_metric(preds, target.argmax(dim=1))
-    sensitivity = sensitivity_metric(preds, target.argmax(dim=1))
+    specificity = specificity_metric(preds, target)
+    sensitivity = sensitivity_metric(preds, target)
     bac = (specificity + sensitivity) / 2
-    aucpr = aucpr_metric(preds, target.argmax(dim=1))
-    auroc = auroc_metric(preds, target.argmax(dim=1))
-
-    return bac, sensitivity, aucpr, auroc
+    aucpr = aucpr_metric(preds, target)
+    auroc = auroc_metric(preds, target)
+    return bac.item(), aucpr.item(), auroc.item()

@@ -1,98 +1,165 @@
-# XAIguiFormer
-This repository contains the official PyTorch implementation of XAIguiFormer, as presented in our ICLR 2025 paper [XAIguiFormer: explainable artificial intelligence guided transformer for brain disorder identification](https://openreview.net/forum?id=AD5yx2xq8R).
+# XAIguiFormer TimeSeries: Temporal-Preserving Variant for EEG Classification
 
-## Abstract
-EEG-based connectomes offer a low-cost and portable method to identify brain disorders using deep learning. With the growing interest in model interpretability and transparency, explainable artificial intelligence (XAI) is widely applied to understand the decision of deep learning models. However, most research focuses solely on interpretability analysis based on the insights from XAI, overlooking XAI’s potential to improve model performance. To bridge this gap, we propose a dynamical-system-inspired architecture, XAI guided transformer (XAIguiFormer), where XAI not only provides explanations but also contributes to enhancing the transformer by refining the originally coarse information in self-attention mechanism to capture more relevant dependency relationships. In order not to damage the connectome’s topological structure, the connectome tokenizer treats the single-band graphs as atomic tokens to generate a sequence in the frequency domain. To address the limitations of conventional positional encoding in understanding the frequency and mitigating the individual differences, we integrate frequency and demographic information into tokens via a rotation matrix, resulting in a richly informative representation. Our experiment demonstrates that XAIguiFormer achieves superior performance over all baseline models. In addition, XAIguiFormer provides valuable interpretability through visualization of the frequency band importance.
+**Branch: main2** - This branch contains our novel time-series implementation that preserves temporal dynamics in EEG signals.
 
-![XAIguiFormer](XAIguiFormer.png)
+## Overview
 
-## Environment Set Up
-A suitable conda environment named XAIguiFormer can be created and activated with:
-```
-conda env create -f environment.yaml
-conda activate XAIguiFormer
-```
-or install the required packages step by step:
-```
-conda create --name XAIguiFormer python=3.10
-conda activate XAIguiFormer
-conda install pytorch torchvision torchaudio pytorch-cuda=11.8 -c pytorch -c nvidia
-conda install pyg -c pyg
-conda install tensorboard
-conda install -c conda-forge einops
-conda install pandas
-conda install matplotlib
-conda install -c conda-forge yacs
-conda install pytorch-scatter -c pyg
-conda install -c conda-forge -c pytorch -c defaults timm
-conda install -c conda-forge torchmetrics
-conda install captum -c pytorch
-conda install bytecode
-```
+This repository implements **XAIguiFormer_TimeSeries**, an extended variant of the original XAIguiFormer architecture designed to address information compression limitations in connectome-based EEG preprocessing. While the original approach compresses EEG signals by approximately 1,350:1 through static connectivity matrices, our time-series variant preserves temporal dynamics using MultiROCKET-based tokenization.
 
-## Data Preparation
-To preprocess the EEG data and construct the connectome, ensure the following libraries (mne, mne_connectivity, mne_icalabel) are installed:
-```
-conda create -c conda-forge --strict-channel-priority --name=mne mne
-conda activate mne
-conda install -c conda-forge mne-connectivity
-conda install -c conda-forge mne-icalabel
-```
+## Key Innovation
 
-### Preprocessing
-One could preprocess the raw EEG data by utils/preprocessing. Before running this code, please don't forget to modify the path of EEG data accordingly in the configs/*_preprocess.yaml and load the corresponding YAML file in the preprocessing.py:
-```
-python utils/preprocessing.py
-```
+**XAIguiFormer_TimeSeries** replaces the connectome tokenizer with a MultiROCKET-based temporal encoder while maintaining the core XAI-guided transformer architecture, enabling direct processing of frequency-filtered EEG signals without destructive temporal averaging.
 
-### Construct the connectome
-To construct the connectome from preprocessed EEG data, you must configure the data paths correctly in the YAML configuration file:
-```
-python utils/constructFC.py
-```
+## Core Contributions
 
-After completing the EEG data preprocessing and connectome construction, you need to prepare the demographics data and organize all required files into the final directory structure as below. You may refer to utils/transform_dataformAndlabel.py.
-```
-EEGBenchmarkDataset     # root path
-├── ...
-├── TUAB
-|   ├── raw             # preprocessed EEG data
-|   |   ├── train       # train dataset
-|   |   |     ├── subject_001
-|   |   |     |       ├── subject_001_coherence.npy
-|   |   |     |       ├── subject_001_wpli.npy
-|   |   |     |       ├── subject_001_demographics.npy
-|   |   |     |       └── subject_001_label.npy
-|   |   |     ├── subject_002
-|   |   |     |       ├── subject_002_coherence.npy
-|   |   |     |       ├── subject_002_wpli.npy
-|   |   |     |       ├── subject_002_demographics.npy
-|   |   |     |       └── subject_002_label.npy
-|   |   |     └── ...
-|   |   ├── val         # val dataset
-|   |   |     └── ...
-|   |   └── test        # test dataset
-|   |         └── ...
-|   └── ...
-└── ...
-```
+- **Temporal Preservation**: Direct processing of EEG time series without connectome conversion
+- **MultiROCKET Integration**: Memory-efficient temporal feature extraction with learnable channel attention
+- **Architectural Compatibility**: Drop-in replacement preserving all downstream XAI components
+- **Chunking Strategy**: Overlapping temporal windows for 3.2x data augmentation
 
-## Run Experiments
-```
-python main.py --dataset TDBRAIN/TUAB
-```
-If you want to change the default hyperparameters, you can update the configuration located in the configs/*_model.yaml.
+## Project Architecture
+XAIguiFormer/                         # root project directory
+├── configs/                          # configuration YAML files
+│   ├── TDBRAIN_model.yaml
+│   └── TDBRAIN_preprocess.yaml
+│
+├── data/                             # raw & processed data, and dataset generation scripts
+│   ├── TDBRAIN_participants_V2_data/          # folder containing raw patient metadata files
+│   ├── TDBRAIN_participants_V2.json
+│   ├── TDBRAIN_participants_V2.tsv
+│   ├── TDBRAIN_participants_V2.xlsx
+│   ├── TDBRAIN_replication_template_V2.xlsx
+│   ├── TDBRAIN_reduced/                       # (collapsed)
+│   ├── TDBRAIN_reduced_timeseries/           # (collapsed)
+│   ├── convert_xls_to_csv.py
+│   └── create_tdbrain_dataset_90.py          # script to build the dataset
+│
+├── models/                           # main model definitions
+│   ├── init.py
+│   └── xaiguiformer_timeseries.py
+│
+├── modules/                          # model submodules (tokenizer, transformer, XAI, etc.)
+│   ├── init.py
+│   ├── explainer_wrapper.py
+│   ├── explainer.py
+│   ├── multirocket_tokenizer.py
+│   ├── positional_encoding_wrapper.py
+│   └── transformer.py
+│
+├── utils/                            # utility scripts for preprocessing, evaluation, data handling
+│   ├── init.py
+│   ├── data_transformer_tensor_timeseries.py
+│   ├── eval_metrics.py
+│   └── preprocessing_timeseries.py
+│
+├── main_timeseries.py                # main training script
+├── poetry.lock                       # poetry environment lock file
+├── pyproject.toml                    # poetry configuration file
+└── README.md                         # project documentation
 
+### Core Components
 
-## Citation
-If you find our paper/code useful, please consider citing our work:
-```
-@inproceedings{
-guo2025XAIguiFormer,
-title={XAIguiFormer: explainable artificial intelligence guided transformer for brain disorder identification},
-author={Hanning Guo, Farah Abdellatif, Yu Fu, N. Jon Shah, Abigail Morrison, Jürgen Dammers},
-booktitle={The Thirteenth International Conference on Learning Representations},
-year={2025},
-url={https://openreview.net/forum?id=AD5yx2xq8R}
-}
-```
+#### Configuration Files (`configs/`)
+- **`TDBRAIN_model.yaml`**: Model architecture parameters, training hyperparameters, and evaluation settings for the TDBRAIN dataset
+- **`TDBRAIN_preprocess.yaml`**: EEG preprocessing pipeline configuration including filtering parameters, ICA settings, and frequency band definitions
+
+#### Data Management (`data/`)
+- **`TDBRAIN_participants_V2_data/`**: Folder containing raw patient metadata files with demographic information (age, gender) and psychiatric disorder labels
+- **`TDBRAIN_participants_V2.json/tsv/xlsx`**: Patient metadata in various formats containing demographic variables and diagnostic labels for psychiatric conditions (ADHD, MDD, SMC, HEALTHY)
+- **`TDBRAIN_replication_template_V2.xlsx`**: Template file for data replication studies
+- **`convert_xls_to_csv.py`**: Utility to convert TDBRAIN participant metadata from Excel to CSV format for easier processing
+- **`create_tdbrain_dataset_90.py`**: Creates a balanced subset of 88 patients (22 per diagnostic category) with stratified train/validation/test splits
+- **`TDBRAIN_reduced_timeseries/`**: Contains preprocessed EEG time series data with frequency band tokenization, but only for a reduced dataset of 88 patients
+
+#### Model Architecture (`models/`)
+- **`xaiguiformer_timeseries.py`**: Main implementation of XAIguiFormer_TimeSeries, integrating MultiROCKET tokenization with the original XAI-guided transformer architecture
+
+#### Model Components (`modules/`)
+- **`multirocket_tokenizer.py`**: MultiROCKET-based temporal feature extractor with learnable channel attention, replacing the original connectome encoder
+- **`transformer.py`**: XAI-guided transformer encoder with demographic-aware rotary frequency encoding (dRoFE)
+- **`explainer.py`**: Unified interface for various XAI methods (DeepLIFT, GradCAM, Integrated Gradients)
+- **`explainer_wrapper.py`**: Low-level implementations of different explainability algorithms
+- **`positional_encoding_wrapper.py`**: Implementation of dRoFE for integrating demographic information into positional encodings
+
+#### Utilities (`utils/`)
+- **`preprocessing_timeseries.py`**: Complete EEG preprocessing pipeline from raw signals to frequency band tokens, including intelligent downsampling and artifact removal
+- **`data_transformer_tensor_timeseries.py`**: PyTorch dataset classes and data loaders for frequency-tokenized EEG data with uniform temporal truncation
+- **`eval_metrics.py`**: Evaluation metrics including balanced accuracy, sensitivity, AUROC, and AUC-PR for psychiatric classification tasks
+
+#### Training (`main_timeseries.py`)
+Main training script implementing the chunking strategy for temporal data augmentation, enabling efficient processing of long EEG sequences while preserving temporal information.
+
+## Installation
+
+### Prerequisites
+- Python 3.10+
+- CUDA-compatible GPU (recommended)
+- 16GB+ RAM for full dataset processing
+
+### Environment Setup
+
+Using Poetry (recommended):
+```bash
+git clone https://github.com/your-repo/XAIguiFormer
+cd XAIguiFormer
+poetry install
+poetry shell
+Alternative using pip:
+bashpip install torch torchvision torchaudio
+pip install torch-geometric
+pip install mne mne-connectivity mne-icalabel
+pip install captum timm einops yacs
+pip install pandas numpy scikit-learn matplotlib
+Usage
+Data Preparation
+
+Convert metadata (if needed):
+
+bashcd data/
+python convert_xls_to_csv.py
+
+Create balanced dataset:
+
+bashcd data/
+python create_tdbrain_dataset_90.py
+
+Preprocess EEG signals:
+
+bashpython utils/preprocessing_timeseries.py
+Training
+Run the time-series model with chunking strategy:
+bashpython main_timeseries.py
+Technical Approach
+XAIguiFormer_TimeSeries Architecture
+XAIguiFormer_TimeSeries addresses information compression limitations:
+
+MultiROCKET Tokenization: 200 random convolutional kernels with learnable channel attention
+Temporal Preservation: Direct processing of frequency-filtered EEG signals without connectome conversion
+Chunking Strategy: Overlapping temporal windows for data augmentation (3.2x increase in training samples)
+Architectural Compatibility: Drop-in replacement maintaining all downstream XAI components
+
+Key Technical Features
+
+Information Preservation: Avoids 1,350:1 compression ratio of original connectome pipeline
+Memory-Efficient Design: Optimized for standard GPU resources (2GB RAM usage)
+Reproducible Kernels: Fixed random seeds ensure consistent MultiROCKET features
+End-to-End Learning: Trainable attention mechanisms for inter-channel dependencies
+
+Results and Limitations
+Achievements
+
+Development of computationally efficient time-series alternative to connectome processing
+Comprehensive framework for EEG temporal modeling with preserved dynamics
+Memory-optimized implementation compatible with standard hardware
+
+Technical Challenges
+
+Implementation Issues: Demographic tensor integration requires debugging for NaN resolution
+Computational Constraints: Full dataset processing requires high-performance computing resources
+Dependency Conflicts: Captum library compatibility issues in certain environments
+
+Future Directions
+
+Integration with foundation models (MANTIS, TimesNet) for enhanced temporal modeling
+Native time-series transformer architectures with embedded XAI mechanisms
+Extended evaluation on larger clinical datasets

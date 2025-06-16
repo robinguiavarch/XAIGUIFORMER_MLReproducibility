@@ -16,9 +16,9 @@ import os
 def create_tdbrain_90_dataset():
     """Crée un dataset de 90 patients avec répartition équilibrée"""
     
-    # Configuration
-    input_file = "data/TDBRAIN_participants_V2.csv"
-    output_file = "data/TDBRAIN_90_patients.csv"
+    # Configuration (chemins relatifs au dossier data/)
+    input_file = "TDBRAIN_participants_V2.csv"
+    output_file = "TDBRAIN_90_patients.csv"
     
     # Répartition cible (88 patients = 22×4)
     target_distribution = {
@@ -30,6 +30,7 @@ def create_tdbrain_90_dataset():
     total_patients = sum(target_distribution.values())  # 88 patients
     
     print("=== Création du dataset TDBRAIN 88 patients ===")
+    print(f"📂 Répertoire de travail: {os.getcwd()}")
     print(f"📖 Lecture du fichier: {input_file}")
     
     try:
@@ -38,6 +39,7 @@ def create_tdbrain_90_dataset():
         
     except FileNotFoundError:
         print(f"❌ Fichier non trouvé: {input_file}")
+        print(f"💡 Vérifiez que le fichier existe dans {os.getcwd()}")
         return None
     except Exception as e:
         print(f"❌ Erreur lors du chargement: {e}")
@@ -182,10 +184,7 @@ def create_tdbrain_90_dataset():
     # Sauvegarder le dataset
     print(f"\n💾 Sauvegarde du dataset...")
     
-    # Créer le répertoire si nécessaire
-    os.makedirs(os.path.dirname(output_file), exist_ok=True)
-    
-    # Sauvegarder
+    # Le fichier sera sauvegardé dans le répertoire courant (data/)
     final_dataset.to_csv(output_file, index=False)
     print(f"✅ Dataset sauvegardé: {output_file}")
     

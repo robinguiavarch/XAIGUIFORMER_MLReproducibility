@@ -1,5 +1,6 @@
 # Datasets volumineux
-data/
+data/TDBRAIN_reduced
+data/TDBRAIN_reduced_timeseries
 
 # Résultats d'entraînement
 results/
