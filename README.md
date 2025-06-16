@@ -4,6 +4,12 @@
 
 ---
 
+## IMPORTANT: This github contains 2 branchs:
+> branch main --> Reproducibility Challenge
+> branch main2_XaiGuiFormerTimeSeries --> New approach with TimeSeries model (see README inside)
+
+---
+
 ##  Project Overview
 
 This repository contains our implementation of **XAIguiFormer** for the ML Reproducibility Challenge, based on the ICLR 2025 paper "XAIguiFormer: Explainable Artificial Intelligence Guided Transformer for Brain Disorder Identification" by Guo et al.
