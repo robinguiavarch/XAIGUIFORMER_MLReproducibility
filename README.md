@@ -21,7 +21,7 @@ XAIguiFormer introduces a novel architecture that leverages explainable AI (XAI)
 
 ---
 
-## 🎯 Core Contributions
+## Core Contributions
 
 ### 1.  **Connectome Tokenizer**
 - Treats single-band graphs as atomic tokens to preserve topological structure
