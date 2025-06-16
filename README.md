@@ -44,7 +44,7 @@ XAIguiFormer introduces a novel architecture that leverages explainable AI (XAI)
 
 ---
 
-## 🏗️ Architecture Overview
+##  Architecture Overview
 
 ```
 EEG Signals → Multi-band Connectomes → GNN Tokenizer → Transformer Encoder
@@ -63,7 +63,7 @@ EEG Signals → Multi-band Connectomes → GNN Tokenizer → Transformer Encoder
 This project uses [Poetry](https://python-poetry.org/) to manage dependencies and environments.
 Poetry is a modern alternative to pip + virtualenv + requirements.txt, offering better reproducibility and project isolation.
 
-### 🔧 Install Poetry
+###  Install Poetry
 If Poetry is not installed yet:
 ```bash
 curl -sSL https://install.python-poetry.org | python3 -
@@ -73,7 +73,7 @@ Then check:
 poetry --version
 ```
 If that fails, follow the guide to configure your shell:  
-👉 https://python-poetry.org/docs/#installation
+ https://python-poetry.org/docs/#installation
 
 ###  Using Poetry in this Project
 All commands below must be run from the root of the project (where `pyproject.toml` is located).
