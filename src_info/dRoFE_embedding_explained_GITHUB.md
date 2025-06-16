@@ -1,10 +1,10 @@
-# 🧠 Understanding `dRoFEEmbedding.py` – Line-by-Line Explanation
+# Understanding `dRoFEEmbedding.py` – Line-by-Line Explanation
 
 This document explains the Python code in `dRoFEEmbedding.py` by linking it directly to the theoretical equations from the XAIGUIFormer paper (ICLR 2025), with GitHub-compatible formatting.
 
 ---
 
-## 📌 Mathematical Background
+## Mathematical Background
 
 - **Equation (9)**: Defines rotary encoding based on frequency bounds (lower and upper).
 - **Equation (10)**: Angular position per embedding dimension: `theta_t = (4π * t) / d`
@@ -16,7 +16,7 @@ This document explains the Python code in `dRoFEEmbedding.py` by linking it dire
 
 ---
 
-## 🧩 Code Explanation
+## Code Explanation
 
 ### Initialization
 
@@ -79,7 +79,7 @@ x_rot = torch.stack([x_rot_real, x_rot_imag], dim=-1).flatten(-2)
 
 ---
 
-## ✅ Summary Table
+## Summary Table
 
 | Math Concept           | Code Line                            | Description                                     |
 |------------------------|---------------------------------------|-------------------------------------------------|

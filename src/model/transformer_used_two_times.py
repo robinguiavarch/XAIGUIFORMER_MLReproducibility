@@ -5,20 +5,22 @@ import torch.nn.functional as F
 
 class XAIGuiAttention(nn.Module):
     """
-    XAI-guided Multi-Head Attention with concurrent explanation injection.
-    Explanations directly replace Query and Key projections during attention computation.
+    Multi-head self-attention layer with optional XAI-guided injection.
+
+    This module allows substitution of the query and key projections
+    with external explanation vectors (e.g., from DeepLIFT),
+    and optionally applies dRoFE-based rotation based on frequency and demographics.
     """
     def __init__(self, embedding_dim=128, num_heads=4, dropout=0.1, use_drofe=True):
         super().__init__()
-
         self.embedding_dim = embedding_dim
         self.num_heads = num_heads
         self.head_dim = embedding_dim // num_heads
         self.use_drofe = use_drofe
 
-        self.q_proj = nn.Linear(embedding_dim, embedding_dim, bias=True)
-        self.k_proj = nn.Linear(embedding_dim, embedding_dim, bias=True)
-        self.v_proj = nn.Linear(embedding_dim, embedding_dim, bias=True)
+        self.q_proj = nn.Linear(embedding_dim, embedding_dim)
+        self.k_proj = nn.Linear(embedding_dim, embedding_dim)
+        self.v_proj = nn.Linear(embedding_dim, embedding_dim)
         self.out_proj = nn.Linear(embedding_dim, embedding_dim)
 
         self.attn_dropout = nn.Dropout(dropout)
@@ -29,40 +31,40 @@ class XAIGuiAttention(nn.Module):
 
     def forward(self, x, context_info=None, explanation=None):
         """
-        Forward pass with optional XAI explanation injection.
-        
+        Forward pass with optional explanation-based injection.
+
         Args:
-            x: Input tensor [B, Freq, d]
-            context_info: Packed frequency bounds and demographics
-            explanation: XAI explanation tensor [B, Freq, d] (if provided)
+            x (Tensor): Input embeddings [B, Freq, d].
+            context_info (Tensor, optional): Packed frequency + demographic info [B, Freq+2, 2].
+            explanation (Tensor, optional): Explanation tensor [B, Freq, d] to override Q and K.
+
+        Returns:
+            Tensor: Output embeddings [B, Freq, d].
         """
         B, Freq, d = x.shape
 
-        # Standard Q, K, V projections
+        # Compute standard Q, K, V
         q = self.q_proj(x)
         k = self.k_proj(x)
         v = self.v_proj(x)
 
-        # XAI Injection: Replace Q and K with explanations if available
+        # Replace Q and K if explanation is provided
         if explanation is not None:
-            q_explanation = self.q_proj(explanation)
-            k_explanation = self.k_proj(explanation)
-            q = q_explanation
-            k = k_explanation
+            q = self.q_proj(explanation)
+            k = self.k_proj(explanation)
 
-        # Apply dRoFE rotation if enabled and context available
+        # Apply dRoFE if enabled
         if self.use_drofe and context_info is not None:
             freq_bounds = context_info[:, :Freq, :2]
-            demographics = context_info[:, Freq:Freq+2, :1].squeeze(-1)
-
-            freq_bounds_single = freq_bounds[0]
+            demographics = context_info[:, Freq:Freq + 2, :1].squeeze(-1)
             age = demographics[:, 0:1]
             gender = demographics[:, 1:2]
+            freq_bounds_single = freq_bounds[0]
 
             q = self.drofe(q, freq_bounds_single, age, gender)
             k = self.drofe(k, freq_bounds_single, age, gender)
 
-        # Multi-head attention computation
+        # Multi-head attention
         q = q.view(B, Freq, self.num_heads, self.head_dim).transpose(1, 2)
         k = k.view(B, Freq, self.num_heads, self.head_dim).transpose(1, 2)
         v = v.view(B, Freq, self.num_heads, self.head_dim).transpose(1, 2)
@@ -73,21 +75,19 @@ class XAIGuiAttention(nn.Module):
 
         attn_output = torch.matmul(attn_weights, v)
         attn_output = attn_output.transpose(1, 2).contiguous().view(B, Freq, d)
-        attn_output = self.out_proj(attn_output)
 
-        return attn_output
+        return self.out_proj(attn_output)
 
 
 class SharedTransformerLayer(nn.Module):
     """
-    Transformer layer supporting both standard and XAI-guided modes.
+    Single transformer layer supporting standard and XAI-guided modes.
+    Includes optional dRoFE-aware attention and GEGLU feedforward.
     """
     def __init__(self, embedding_dim=128, num_heads=4, dropout=0.1, use_drofe=True):
         super().__init__()
 
-        self.embedding_dim = embedding_dim
         self.attention = XAIGuiAttention(embedding_dim, num_heads, dropout, use_drofe)
-
         self.ff_linear1 = nn.Linear(embedding_dim, 2 * embedding_dim)
         self.ff_linear2 = nn.Linear(embedding_dim, embedding_dim)
 
@@ -96,26 +96,39 @@ class SharedTransformerLayer(nn.Module):
         self.dropout = nn.Dropout(dropout)
 
     def geglu(self, x):
+        """
+        GEGLU activation (Gated GELU) for feed-forward networks.
+        """
         x1, x2 = x.chunk(2, dim=-1)
         return F.gelu(x1) * x2
 
     def forward(self, x, context_info=None, explanation=None):
-        # Self-attention with optional XAI guidance
-        attn_output = self.attention(x, context_info, explanation)
-        x = x + self.dropout(attn_output)
-        x = self.norm1(x)
+        """
+        Forward pass through attention and feedforward blocks.
 
-        # Feed-forward network
+        Args:
+            x (Tensor): Input embeddings [B, Freq, d].
+            context_info (Tensor, optional): Packed frequency + demographic info.
+            explanation (Tensor, optional): XAI-guided explanation vector for attention.
+
+        Returns:
+            Tensor: Output after attention and FFN layers.
+        """
+        attn_output = self.attention(x, context_info, explanation)
+        x = self.norm1(x + self.dropout(attn_output))
+
         ff_out = self.ff_linear2(self.geglu(self.ff_linear1(x)))
-        x = x + self.dropout(ff_out)
-        x = self.norm2(x)
+        x = self.norm2(x + self.dropout(ff_out))
 
         return x
 
 
 class SharedTransformerEncoder(nn.Module):
     """
-    Shared transformer encoder supporting dual-pass XAI-guided processing.
+    Stack of shared transformer layers supporting standard and XAI-guided modes.
+
+    Allows integration of external explanations at each layer,
+    and supports demographic conditioning via dRoFE.
     """
     def __init__(self, embedding_dim=128, num_heads=4, num_layers=12, dropout=0.1, use_drofe=True):
         super().__init__()
@@ -128,44 +141,55 @@ class SharedTransformerEncoder(nn.Module):
         self.final_norm = nn.RMSNorm(embedding_dim)
 
     def _pack_context(self, freq_bounds, demographic_info):
-        """Pack frequency bounds and demographics for dRoFE."""
+        """
+        Prepare and concatenate frequency bounds and demographics.
+
+        Args:
+            freq_bounds (Tensor): [Freq, 2].
+            demographic_info (Tensor): [B, 2].
+
+        Returns:
+            Tensor: [B, Freq + 2, 2] packed context.
+        """
         B = demographic_info.shape[0]
         Freq = freq_bounds.shape[0]
 
         freq_bounds_batched = freq_bounds.unsqueeze(0).repeat(B, 1, 1)
         demographics_padded = demographic_info.unsqueeze(-1).repeat(1, 1, 2)
 
-        context_info = torch.cat([freq_bounds_batched, demographics_padded], dim=1)
-        return context_info
+        return torch.cat([freq_bounds_batched, demographics_padded], dim=1)
 
     def forward(self, x, freq_bounds=None, demographic_info=None, explanations=None, mode='standard'):
         """
-        Forward pass through transformer layers.
-        
+        Forward pass through transformer stack.
+
         Args:
-            x: Input embeddings [B, Freq, d]
-            freq_bounds: Frequency band bounds [Freq, 2]
-            demographic_info: Age and gender [B, 2]
-            explanations: List of layer explanations (for XAI-guided mode)
-            mode: 'standard' or 'xai_guided'
+            x (Tensor): Input embeddings [B, Freq, d].
+            freq_bounds (Tensor, optional): EEG band bounds [Freq, 2].
+            demographic_info (Tensor, optional): Age and gender [B, 2].
+            explanations (List[Tensor], optional): One per layer for XAI-guided mode.
+            mode (str): Either 'standard' or 'xai_guided'.
+
+        Returns:
+            Tensor: Final output after all transformer layers.
         """
         context_info = None
         if mode == 'standard' and freq_bounds is not None and demographic_info is not None:
             context_info = self._pack_context(freq_bounds, demographic_info)
 
         for i, layer in enumerate(self.layers):
-            layer_explanation = None
-            if mode == 'xai_guided' and explanations is not None and i < len(explanations):
-                layer_explanation = explanations[i]
-
-            x = layer(x, context_info, layer_explanation)
+            layer_expl = explanations[i] if (mode == 'xai_guided' and explanations is not None and i < len(explanations)) else None
+            x = layer(x, context_info, layer_expl)
 
         return self.final_norm(x)
 
 
 class CaptumExplainerWrapper(nn.Module):
     """
-    Wrapper for Captum compatibility in explanation generation.
+    Wrapper to adapt transformer+classifier for Captum-based explanation generation.
+
+    This interface matches Captum's multi-input requirement, and extracts 
+    context from packed tensors during explanation attribution.
     """
     def __init__(self, transformer, classifier):
         super().__init__()
@@ -173,6 +197,16 @@ class CaptumExplainerWrapper(nn.Module):
         self.classifier = classifier
 
     def forward(self, x, context_info=None):
+        """
+        Forward method for Captum compatibility.
+
+        Args:
+            x (Tensor): Input embeddings [B, Freq, d].
+            context_info (Tensor, optional): Packed context [B, Freq+2, 2].
+
+        Returns:
+            Tensor: Logits [B, C].
+        """
         mode = 'standard' if context_info is not None else 'xai_guided'
 
         freq_bounds = None
@@ -183,10 +217,10 @@ class CaptumExplainerWrapper(nn.Module):
             Freq = total_len - 2
 
             freq_bounds = context_info[0, :Freq, :2]
-            demographics_raw = context_info[:, Freq:Freq+2, 0]
+            demographics_raw = context_info[:, Freq:Freq + 2, 0]
             demographic_info = demographics_raw
 
-        x_out = self.transformer(x, freq_bounds, demographic_info, None, mode)
+        x_out = self.transformer(x, freq_bounds, demographic_info, explanations=None, mode=mode)
         logits = self.classifier(x_out.mean(dim=1))
 
         return logits

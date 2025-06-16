@@ -1,11 +1,11 @@
 """
 losses.py
 
-Ce fichier contient :
-- Le calcul des poids de classe pour données déséquilibrées.
-- Une version pondérée de la CrossEntropyLoss.
-- Une classe XAIGuidedLoss combinant les sorties coarse et refined
-  conformément à l'article XAIguiFormer (sans régularisation attention pour l’instant).
+This file contains:
+- Class weight computation for imbalanced datasets.
+- A weighted version of CrossEntropyLoss.
+- The XAIGuidedLoss class, which combines coarse and refined outputs
+  according to the XAIguiFormer paper (without attention regularization for now).
 """
 
 import torch
@@ -16,14 +16,13 @@ from collections import Counter
 
 def compute_class_weights(graphs):
     """
-    Calcule les poids inverses de fréquence pour chaque classe à partir
-    d'une liste de graphes torch_geometric contenant un attribut 'y'.
+    Compute inverse-frequency class weights from a list of PyTorch Geometric graphs.
 
     Args:
-        graphs (list of torch_geometric.data.Data): Liste des graphes avec leurs labels.
+        graphs (List[torch_geometric.data.Data]): List of graphs with 'y' attribute as class label.
 
     Returns:
-        torch.Tensor: Poids des classes (de taille [num_classes]), à utiliser avec CrossEntropyLoss.
+        torch.Tensor: Class weights of shape [num_classes], suitable for CrossEntropyLoss.
     """
     labels = [data.y.item() for data in graphs]
     counter = Counter(labels)
@@ -36,27 +35,32 @@ def compute_class_weights(graphs):
 
 def weighted_cross_entropy_loss(outputs, targets, class_weights):
     """
-    Calcule la perte CrossEntropy pondérée en fonction des poids de classes fournies.
+    Compute a weighted CrossEntropyLoss using provided class weights.
 
     Args:
-        outputs (torch.Tensor): Logits du modèle (batch_size, num_classes).
-        targets (torch.Tensor): Labels cibles (batch_size).
-        class_weights (torch.Tensor): Poids des classes (num_classes).
+        outputs (torch.Tensor): Model logits of shape [batch_size, num_classes].
+        targets (torch.Tensor): Ground truth labels of shape [batch_size].
+        class_weights (torch.Tensor): Class weights of shape [num_classes].
 
     Returns:
-        torch.Tensor: Perte moyenne du batch.
+        torch.Tensor: Scalar loss averaged over the batch.
     """
     return F.cross_entropy(outputs, targets, weight=class_weights)
 
 
 class XAIGuidedLoss(nn.Module):
     """
-    Combine deux sorties de classification (coarse et refined) avec pondération alpha.
+    Combines two classification outputs (coarse and refined) using a weighted sum.
+
+    This loss is designed for models like XaiGuiFormer that output both
+    intermediate ("coarse") and final ("refined") predictions.
 
     Args:
-        class_weights (Tensor): Poids des classes (pour déséquilibre).
-        alpha (float): Pondération entre coarse et refined loss.
+        class_weights (torch.Tensor): Class weights to address class imbalance.
+        alpha (float): Weighting factor between coarse and refined losses.
+                       alpha=1.0 uses only refined loss; alpha=0.0 uses only coarse.
     """
+
     def __init__(self, class_weights, alpha=0.5):
         super(XAIGuidedLoss, self).__init__()
         self.class_weights = class_weights
@@ -64,13 +68,15 @@ class XAIGuidedLoss(nn.Module):
 
     def forward(self, logits_coarse, logits_refined, targets):
         """
+        Compute the weighted combined loss from coarse and refined outputs.
+
         Args:
-            logits_coarse (Tensor): Logits coarse [B, C]
-            logits_refined (Tensor): Logits refined [B, C]
-            targets (Tensor): Labels [B]
+            logits_coarse (torch.Tensor): Coarse logits of shape [B, C].
+            logits_refined (torch.Tensor): Refined logits of shape [B, C].
+            targets (torch.Tensor): Ground truth class labels of shape [B].
 
         Returns:
-            Tensor: Perte totale.
+            torch.Tensor: Scalar total loss value.
         """
         loss_coarse = weighted_cross_entropy_loss(logits_coarse, targets, self.class_weights)
         loss_refined = weighted_cross_entropy_loss(logits_refined, targets, self.class_weights)

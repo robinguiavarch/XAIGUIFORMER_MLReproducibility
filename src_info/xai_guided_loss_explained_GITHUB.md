@@ -1,10 +1,10 @@
-# 📉 Understanding `losses.py` – XAI-Guided Loss Explained
+# Understanding `losses.py` – XAI-Guided Loss Explained
 
 This document explains the role and structure of the `XAIGuidedLoss` class used in XAIguiFormer. It defines a **joint loss function** combining the predictions from both the **vanilla transformer** and the **XAI-guided transformer**, encouraging complementary learning.
 
 ---
 
-## 📌 Theoretical Background
+## Theoretical Background
 
 XAIGuiFormer uses **two prediction heads**:
 - A **coarse prediction** from the vanilla transformer (standard attention)
@@ -24,7 +24,7 @@ Where:
 
 ---
 
-## 🧩 Code Breakdown – `XAIGuidedLoss`
+## Code Breakdown – `XAIGuidedLoss`
 
 ```python
 class XAIGuidedLoss(nn.Module):
@@ -46,7 +46,7 @@ class XAIGuidedLoss(nn.Module):
 
 ---
 
-## 🧮 Architecture Diagram
+## Architecture Diagram
 
 ```
 XAIGuidedLoss/
@@ -70,7 +70,7 @@ XAIGuidedLoss/
 
 ---
 
-## ✅ Summary
+## Summary
 
 - Allows the model to balance learning between the vanilla and XAI-guided paths.
 - Encourages the refined attention mechanism to improve beyond the vanilla baseline.

@@ -1,10 +1,10 @@
-# 🧠 Understanding `trainer.py` – End-to-End Forward Pipeline
+# Understanding `trainer.py` – End-to-End Forward Pipeline
 
 This document explains the full architecture implemented in `trainer.py`, including how the different modules (dRoFE, Transformer, XAI, and loss) interact. It also includes a full input/output trace and model-level reasoning.
 
 ---
 
-## 📌 Overall Pipeline Structure
+## Overall Pipeline Structure
 
 The `Trainer` class coordinates the entire XAIGuiFormer architecture:
 
@@ -17,7 +17,7 @@ The `Trainer` class coordinates the entire XAIGuiFormer architecture:
 
 ---
 
-## 🧩 Step-by-Step Architecture
+## Step-by-Step Architecture
 
 ```
 Trainer/
@@ -60,7 +60,7 @@ Trainer/
 
 ---
 
-## ✅ Key Design Insights
+## Key Design Insights
 
 - Demographic encoding (dRoFE) allows the model to personalize frequency token embeddings.
 - XAI guidance enforces **meaningful attention** based on saliency maps.
@@ -68,7 +68,7 @@ Trainer/
 
 ---
 
-## ⚠️ Remaining TODOs
+## Remaining TODOs
 
 - Integrate actual `ConnectomeTokenizer` output into `x_raw`
 - Use a real `explainer.py` implementation (e.g., Captum’s DeepLIFT)

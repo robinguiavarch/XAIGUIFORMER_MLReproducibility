@@ -1,10 +1,10 @@
-# 🧠 Understanding `explainers.py` – DeepLIFT-based Attribution for XAIguiFormer
+# Understanding `explainers.py` – DeepLIFT-based Attribution for XAIguiFormer
 
 This document explains how the module `explainers.py` works, focusing on the **DeepLIFT explainer** used to generate token-level importance scores for the XAI-guided attention mechanism in XAIguiFormer.
 
 ---
 
-## 📌 Scientific Background – DeepLIFT (Shrikumar et al., 2017)
+## Scientific Background – DeepLIFT (Shrikumar et al., 2017)
 
 DeepLIFT (Deep Learning Important FeaTures) is an **XAI technique** that attributes output predictions to input features by **comparing activations to a reference (baseline)** and computing contributions based on differences.
 
@@ -25,7 +25,7 @@ In XAIguiFormer, DeepLIFT is applied to the **vanilla transformer's classifier o
 
 ---
 
-## 🧩 Code Breakdown – `Explainer` Class
+## Code Breakdown – `Explainer` Class
 
 ```python
 from captum.attr import DeepLift
@@ -64,7 +64,7 @@ class Explainer:
 
 ---
 
-## 🖼️ Module Architecture
+## Module Architecture
 
 ```
 Explainer/
@@ -87,7 +87,7 @@ Explainer/
 
 ---
 
-## ✅ Summary
+## Summary
 
 - DeepLIFT identifies which **EEG frequency band tokens** (and which embedding dimensions) contribute the most to the vanilla transformer prediction.
 - This importance map is injected into the **XAI-guided attention** as refined $Q$ and $K$.

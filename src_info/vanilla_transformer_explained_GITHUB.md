@@ -1,12 +1,12 @@
-# 🧠 Understanding `vanilla_transformer.py` – Transformer Encoder Explained
+# Understanding `vanilla_transformer.py` – Transformer Encoder Explained
 
 This document explains the logic of `vanilla_transformer.py` line by line, in relation to the Transformer architecture used in XAIGUIFormer, focusing on the **vanilla Transformer encoder** (not XAI-guided yet).
 
 ---
 
-## 📌 Scientific Background – Transformer Core Concepts
+## Scientific Background – Transformer Core Concepts
 
-### 🔹 Multi-Head Attention
+### Multi-Head Attention
 
 Given an input tensor `X ∈ ℝ^{B × F × d}`, the Transformer computes:
 
@@ -26,7 +26,7 @@ Multiple heads are used in parallel to learn **diverse interactions**. Their out
 
 ---
 
-### 🔹 RMSNorm (Root Mean Square LayerNorm)
+### RMSNorm (Root Mean Square LayerNorm)
 
 A lightweight alternative to LayerNorm:
 
@@ -39,7 +39,7 @@ Used instead of LayerNorm to reduce compute while preserving stability.
 
 ---
 
-### 🔹 Feedforward Network (FFN)
+### Feedforward Network (FFN)
 
 Each encoder block includes a 2-layer MLP applied to each token independently:
 
@@ -51,7 +51,7 @@ This increases the expressivity of the model.
 
 ---
 
-## 🧩 Code Breakdown – `VanillaTransformerEncoder`
+## Code Breakdown – `VanillaTransformerEncoder`
 
 ```python
 class VanillaTransformerEncoder(nn.Module):
@@ -85,7 +85,7 @@ def forward(self, x):
 
 ---
 
-## 🖼️ Architecture Diagram
+## Architecture Diagram
 
 ```
 Input → Connectome Tokenizer → [Vanilla Multi-Head Attention → RMSNorm → Feed Forward → RMSNorm] → Output
@@ -95,7 +95,7 @@ This encoder block is stacked `L` times (e.g. 4 layers) to form a deep Transform
 
 ---
 
-## ✅ Summary
+## Summary
 
 - **Q, K, V** are computed directly from the input tokens.
 - **Attention** learns relations between EEG frequency bands.

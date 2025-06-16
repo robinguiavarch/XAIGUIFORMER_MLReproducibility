@@ -1,6 +1,6 @@
 """
 Ablation Study Script – XAIguiFormer
-Évalue les variantes du modèle avec ou sans certaines composantes clés (Explainer, dRoFE, Demographics).
+Evaluates different variants of the model with or without key components (Explainer, dRoFE, Demographics).
 """
 
 import os
@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import LabelEncoder
 from torch_geometric.loader import DataLoader
 
-# Chemin vers src
+# Add path to src
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../src")))
 
 from config import get_cfg_defaults
@@ -23,7 +23,7 @@ from model.xaiguiformer_pipeline import XaiGuiFormer
 from model.evaluator import evaluate
 
 # =======================
-# Paramètres
+# Parameters
 # =======================
 SEEDS = [42, 123, 2024]
 RESULTS_DIR = "results/ablation_study"
@@ -39,17 +39,44 @@ ABLATION_VARIANTS = {
 
 
 def set_seed(seed):
+    """
+    Set random seed for reproducibility across torch, numpy, and random.
+
+    Args:
+        seed (int): The seed value to set.
+    """
     torch.manual_seed(seed)
     np.random.seed(seed)
     random.seed(seed)
 
 
 def load_dataset(path):
+    """
+    Load a pickled dataset from disk.
+
+    Args:
+        path (str): Path to the .pkl file.
+
+    Returns:
+        list: A list of graph data objects.
+    """
     with open(path, "rb") as f:
         return pickle.load(f)
 
 
 def train(model, loader, optimizer, device):
+    """
+    Perform one training epoch.
+
+    Args:
+        model (torch.nn.Module): The model to train.
+        loader (DataLoader): A PyTorch Geometric DataLoader for batched graph data.
+        optimizer (torch.optim.Optimizer): The optimizer to use.
+        device (torch.device): The computation device (CPU or CUDA).
+
+    Returns:
+        float: The average loss over the training epoch.
+    """
     model.train()
     total_loss = 0.0
     for batch in loader:
@@ -85,7 +112,7 @@ if __name__ == "__main__":
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     for ablation_name, ablation_flags in ABLATION_VARIANTS.items():
-        print(f"\nVariante: {ablation_name}")
+        print(f"\nVariant: {ablation_name}")
         variant_results = []
 
         for seed in SEEDS:
@@ -119,7 +146,7 @@ if __name__ == "__main__":
                 train_loss = train(model, train_loader, optimizer, device)
                 print(f"[{ablation_name} | Seed {seed}] Epoch {epoch} | Loss = {train_loss:.4f}")
 
-            # === Évaluation ===
+            # === Evaluation ===
             metrics = evaluate(model, test_loader, class_names=label_encoder.classes_, device=device)
             metrics["seed"] = seed
             variant_results.append(metrics)
@@ -127,14 +154,14 @@ if __name__ == "__main__":
             with open(os.path.join(RESULTS_DIR, f"{ablation_name}_seed{seed}.json"), "w") as f:
                 json.dump(metrics, f, indent=4)
 
-        # === Résumé par variante ===
+        # === Summary for each variant ===
         df = pd.DataFrame(variant_results)
         summary = {
             "mean": df.mean(numeric_only=True).round(4).to_dict(),
             "std": df.std(numeric_only=True).round(4).to_dict()
         }
 
-        print(f"\nRésultats {ablation_name}")
+        print(f"\nResults for {ablation_name}")
         print(pd.DataFrame(summary))
 
         with open(os.path.join(RESULTS_DIR, f"{ablation_name}_summary.json"), "w") as f:

@@ -1,14 +1,14 @@
-# 🧠 Understanding `xai_guided_transformer.py` – XAI-Guided Transformer Explained
+# Understanding `xai_guided_transformer.py` – XAI-Guided Transformer Explained
 
 This document explains the structure and purpose of the `xai_guided_transformer.py` module, which implements the **XAI-guided Transformer block** in XAIGUIFormer.
 
 ---
 
-## 📌 Scientific Background – XAI-Guided Attention
+## Scientific Background – XAI-Guided Attention
 
 Unlike the vanilla Transformer that uses learned Q and K projections, this module **replaces Q and K with XAI-explained importance vectors** (e.g. DeepLIFT explanations).
 
-### 🔹 Custom Attention Mechanism
+### Custom Attention Mechanism
 
 The attention score is recalculated manually using:
 
@@ -24,7 +24,7 @@ This allows attention to **focus on semantically meaningful relationships** iden
 
 ---
 
-### 🔹 Feedforward Network – GeGLU
+### Feedforward Network – GeGLU
 
 This module uses **GeGLU (Gated GELU)** activation in the feedforward network:
 
@@ -42,7 +42,7 @@ Where `W1` splits into two heads: `x1, x2 ∈ ℝ^d`.
 
 ---
 
-### 🔹 Normalization – RMSNorm
+### Normalization – RMSNorm
 
 As in the vanilla encoder, each sub-block (attention, FFN) is followed by **residual + RMSNorm** for training stability:
 
@@ -52,7 +52,7 @@ RMSNorm(x) = x / RMS(x) * gamma
 
 ---
 
-## 🧩 Code Breakdown – `XAIGuidedTransformerEncoder`
+## Code Breakdown – `XAIGuidedTransformerEncoder`
 
 ```python
 class XAIGuidedTransformerLayer(nn.Module):
@@ -77,7 +77,7 @@ class XAIGuidedTransformerEncoder(nn.Module):
 
 ---
 
-## 🖼️ Architecture Diagram
+## Architecture Diagram
 
 ```
 Input from Vanilla Transformer → XAI (DeepLIFT) → [XAI-guided Multi-Head Attention → RMSNorm → Feed Forward (GeGLU) → RMSNorm] × L → Output
@@ -85,7 +85,7 @@ Input from Vanilla Transformer → XAI (DeepLIFT) → [XAI-guided Multi-Head Att
 
 ---
 
-## ✅ Summary
+## Summary
 
 - Uses **XAI explanations as inputs to attention**, improving interpretability.
 - Employs **custom attention computation** (manual Qexpl, Kexpl dot-product).

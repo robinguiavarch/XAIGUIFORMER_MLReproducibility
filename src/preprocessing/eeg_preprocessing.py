@@ -1,6 +1,7 @@
 """
-EEG preprocessing script for CSV-formatted RestEC (eyes closed) data.
-Implements PREP pipeline, filtering, ICA, epoching, and average referencing.
+EEG preprocessing script for RestEC (eyes-closed) data in CSV format.
+Implements PREP pipeline, bandpass filtering, ICA with ICLabel,
+epoching, and average referencing.
 """
 
 import os
@@ -18,58 +19,72 @@ from config import get_cfg_defaults
 
 def custom_read_raw_csv(fname, montage, phenotype, preload=True):
     """
-    Charge un fichier EEG au format CSV avec les bons types de canaux,
-    le montage EEG standard et crée des événements "yeux fermés" artificiels.
-    """
-    import pandas as pd
-    from mne import create_info
-    from mne.io import RawArray
+    Load EEG data from a CSV file with proper channel types, montage,
+    and synthetic event creation for resting-state 'eyes closed' protocol.
 
+    Args:
+        fname (str): Path to the CSV file.
+        montage (mne.channels.DigMontage): EEG montage to apply.
+        phenotype (str): Subject ID or metadata string.
+        preload (bool): Whether to preload data into memory.
+
+    Returns:
+        mne.io.Raw: MNE Raw object with artificial event markers added.
+    """
     df = pd.read_csv(fname)
     ch_names = df.columns.tolist()
-    sfreq = 250  # <- À adapter si ce n’est pas correct
+    sfreq = 250  # Adapt if necessary
     data = df.values.T
 
-    info = create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
-    raw = RawArray(data, info)
+    info = mne.create_info(ch_names=ch_names, sfreq=sfreq, ch_types="eeg")
+    raw = mne.io.RawArray(data, info)
 
-    # Marquer les canaux spéciaux comme non-EEG
+    # Identify special channels and assign correct types
     special_types = {
         'VPVA': 'eog', 'VNVB': 'eog',
         'HPHL': 'eog', 'HNHR': 'eog',
         'Erbs': 'ecg', 'OrbOcc': 'eog',
         'Mass': 'emg'
     }
-
-    # Vérifie lesquels de ces canaux sont présents et change leur type
     present_specials = {k: v for k, v in special_types.items() if k in raw.ch_names}
     raw.set_channel_types(present_specials)
 
-    # Montage seulement pour les canaux EEG
-    raw.set_montage(montage, on_missing='ignore')  # on_missing=‘ignore’ pour éviter l’erreur
+    # Apply montage to EEG channels only
+    raw.set_montage(montage, on_missing='ignore')
+
+    # Artificial events for "eyes closed" state
     raw.custom_events = mne.make_fixed_length_events(raw, id=30, start=0, stop=120, duration=40, overlap=20)
     raw.custom_event_id = {'eyes close': 30}
     raw.info['description'] = phenotype
-    return raw
 
+    return raw
 
 
 def preprocessing(raw, config, verbose=True):
     """
-    Full preprocessing pipeline (PREP, filtering, epoching, ICA, reref).
+    Full preprocessing pipeline for a raw EEG object.
+
+    Steps:
+        1. Bad channel detection and interpolation (PREP).
+        2. Bandpass filtering.
+        3. Downsampling to 250 Hz.
+        4. Epoching eyes-closed periods.
+        5. ICA decomposition and ICLabel artifact rejection.
+        6. Interpolation of bad channels.
+        7. Average reference re-referencing.
 
     Args:
-        raw (mne.io.Raw): Raw EEG object.
-        config: yacs config.
-        verbose (bool): Show progress.
+        raw (mne.io.Raw): Raw EEG signal.
+        config (CfgNode): Configuration object.
+        verbose (bool): Whether to print progress.
 
     Returns:
-        raw: Preprocessed MNE Epochs object.
+        mne.Epochs: Preprocessed and cleaned EEG epochs.
     """
     n_jobs = config.preprocessing.n_jobs
     n_step = 0
 
-    # === Step 1: PREP pipeline (bad channel interpolation)
+    # Step 1: PREP pipeline
     n_step += 1
     if verbose:
         print(f"[Step {n_step}] Detecting bad channels...")
@@ -82,36 +97,46 @@ def preprocessing(raw, config, verbose=True):
             config.preprocessing.line_frequency
         )
     }
-    prep = PrepPipeline(raw, prep_params, raw.get_montage(), channel_wise=True,
-                        filter_kwargs={"method": "fir", "n_jobs": n_jobs})
+    prep = PrepPipeline(
+        raw,
+        prep_params,
+        raw.get_montage(),
+        channel_wise=True,
+        filter_kwargs={"method": "fir", "n_jobs": n_jobs}
+    )
     prep.fit()
     raw.info['bads'] = prep.interpolated_channels
 
-    # === Step 2: Bandpass filter
+    # Step 2: Bandpass filtering
     n_step += 1
     if verbose:
         print(f"[Step {n_step}] Bandpass filtering...")
-    raw.filter(l_freq=config.preprocessing.l_freq,
-               h_freq=config.preprocessing.h_freq, n_jobs=n_jobs)
+    raw.filter(
+        l_freq=config.preprocessing.l_freq,
+        h_freq=config.preprocessing.h_freq,
+        n_jobs=n_jobs
+    )
 
-    # === Step 3: Resample
+    # Step 3: Resampling
     n_step += 1
     if verbose:
         print(f"[Step {n_step}] Resampling to 250 Hz...")
     raw = raw.resample(250)
 
-    # === Step 4: Epoching eyes closed
+    # Step 4: Epoching
     n_step += 1
     if verbose:
         print(f"[Step {n_step}] Creating epochs (eyes closed)...")
     events = raw.custom_events
     event_id = raw.custom_event_id
     tmin, tmax = 5, 35
-    epochs = mne.Epochs(raw, events=events, event_id=event_id,
-                        tmin=tmin, tmax=tmax, baseline=None,
-                        preload=True, proj=False)
+    epochs = mne.Epochs(
+        raw, events=events, event_id=event_id,
+        tmin=tmin, tmax=tmax, baseline=None,
+        preload=True, proj=False
+    )
 
-    # === Step 5: ICA + ICLabel
+    # Step 5: ICA and ICLabel
     n_step += 1
     if verbose:
         print(f"[Step {n_step}] Running ICA + ICLabel...")
@@ -132,29 +157,29 @@ def preprocessing(raw, config, verbose=True):
     print(f"Excluding ICA components: {np.array(labels)[ica.exclude]}")
     raw_ica = ica.apply(epochs)
 
-    # === Step 6: Interpolate
+    # Step 6: Interpolation
     n_step += 1
     if verbose:
-        print(f"[Step {n_step}] Interpolating...")
+        print(f"[Step {n_step}] Interpolating bad channels...")
     raw_ica = raw_ica.interpolate_bads()
 
-    # === Step 7: Average reference
+    # Step 7: Average reference
     n_step += 1
     if verbose:
-        print(f"[Step {n_step}] Re-referencing...")
+        print(f"[Step {n_step}] Applying average reference...")
     return raw_ica.set_eeg_reference(ref_channels='average', ch_type='eeg')
 
 
 def preprocessingPipeline(fname, montage, phenotype, config, save_path):
     """
-    Run the full preprocessing pipeline from a CSV RestEC file.
+    Run the full preprocessing pipeline from a CSV file and save the result.
 
     Args:
-        fname: Path to CSV.
-        montage: MNE DigMontage.
-        phenotype: Subject ID string.
-        config: Global config.
-        save_path: Where to write .fif
+        fname (str): Path to the input CSV file.
+        montage (mne.DigMontage): EEG montage to apply.
+        phenotype (str): Subject ID or description string.
+        config (CfgNode): Configuration object.
+        save_path (str): Path to save the output .fif file.
     """
     raw = custom_read_raw_csv(fname, montage, phenotype)
     if raw.info['description'] != 'bad':
@@ -162,7 +187,7 @@ def preprocessingPipeline(fname, montage, phenotype, config, save_path):
         os.makedirs(os.path.dirname(save_path), exist_ok=True)
         processed.save(save_path, fmt='double', overwrite=True)
     else:
-        print(f"[{phenotype}] Data labeled as bad — skipped.")
+        print(f"[{phenotype}] Data labeled as bad — skipping.")
 
 
 if __name__ == "__main__":
@@ -187,5 +212,5 @@ if __name__ == "__main__":
             if file.endswith("_task-restEC_eeg.csv"):
                 file_base = file.replace("_task-restEC_eeg.csv", "")
                 fname = os.path.join(ses_path, file)
-                save_path = os.path.join(save_dir, subj_dir, "ses-1", f'{file_base}_EC_epo.fif')
+                save_path = os.path.join(save_dir, subj_dir, "ses-1", f"{file_base}_EC_epo.fif")
                 preprocessingPipeline(fname, montage, file_base, cfg, save_path)
