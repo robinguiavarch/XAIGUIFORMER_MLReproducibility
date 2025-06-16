@@ -1,0 +1,36 @@
+# Datasets volumineux
+data/
+
+# Résultats d'entraînement
+results/
+logs/
+outputs/
+checkpoints/
+*.pt
+*.pth
+
+# Cache Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.venv/
+venv/
